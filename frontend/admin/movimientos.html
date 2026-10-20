@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b0b0f"><link rel="icon" href="/assets/endura-icon.png"><link rel="stylesheet" href="/admin/admin.css?v=1"><title>Endura · Movimientos</title></head>
+<body class="booting" data-page="inventory">
+<div class="app"><main class="main">
+<div class="top"><div><div class="eyebrow"><a href="/admin/" style="color:inherit">Inventario</a></div><h1 class="title" id="title">Movimientos</h1>
+  <p class="desc" id="desc">Cada entrada y salida de bodega con su lote, costo, saldo y quién la registró.</p></div>
+  <div class="topactions"><a id="back" class="quiet" href="/admin/">← Volver al inventario</a></div></div>
+<section class="panel"><div class="panelhead"><div><h2>Historial</h2><p id="countLine">—</p></div>
+  <div class="filters"><select id="fType" class="filter" aria-label="Tipo"></select><input id="fSearch" class="search" type="search" placeholder="Producto, nota o usuario…" aria-label="Buscar"></div></div>
+  <div class="tablewrap"><table><thead><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th class="right">Cantidad</th><th class="right">Saldo</th><th>Lote</th><th class="right">Costo unit.</th><th>Detalle</th></tr></thead><tbody id="rows"><tr><td colspan="8" class="empty">Cargando…</td></tr></tbody></table></div></section>
+</main></div>
+<script src="/admin/app.js?v=1"></script>
+<script>
+const E=Endura,{$,esc,money,int}=E;const pid=new URLSearchParams(location.search).get('producto');
+E.start(async()=>{const cat=await E.catalogs();$('fType').innerHTML='<option value="all">Todos los tipos</option>'+E.options(cat.movement_labels);
+  if(pid){const p=await E.api('/inventory/'+pid);$('title').textContent=p.name;$('desc').textContent=`${p.sku} · ${p.brand} · ${int(p.quantity)} unidades hoy`;$('back').href='/admin/?producto='+pid}await load()});
+async function load(){const q=new URLSearchParams({movement_type:$('fType').value,search:$('fSearch').value.trim()});if(pid)q.set('product_id',pid);
+  try{const d=await E.api('/movements?'+q);$('countLine').textContent=`${d.items.length} movimiento(s)${d.items.length>=1000?' (últimos 1.000)':''}`;
+  $('rows').innerHTML=d.items.length?d.items.map(m=>`<tr><td class="nowrap">${new Date(m.created_at).toLocaleString('es-CO',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</td>
+  <td><a href="/admin/movimientos.html?producto=${m.product_id}"><strong>${esc(m.product_name)}</strong></a><div class="muted">${esc(m.sku)}</div></td><td><span class="tag">${esc(m.type_label)}</span></td>
+  <td class="right"><strong style="color:${m.quantity_delta<0?'var(--danger)':'var(--ok)'}">${m.quantity_delta>0?'+':''}${int(m.quantity_delta)}</strong></td><td class="right">${int(m.quantity_after)}</td>
+  <td>${m.expiry_date?E.fmtMonth(m.expiry_date):'<span class="muted">Sin fecha</span>'}</td><td class="right">${m.unit_cost!=null?money(m.unit_cost):'—'}</td>
+  <td>${esc(m.note)}${m.sale_id?`<div class="muted"><a href="/admin/${m.sale_kind==='sale'?'ventas':'patrocinios'}.html${m.sale_kind==='sale'?'?todas=1&venta='+m.sale_id:''}">Ver registro #${m.sale_number}</a></div>`:''}<div class="muted">${esc(m.username||'Sistema')}</div></td></tr>`).join('')
+  :'<tr><td colspan="8" class="empty">Sin movimientos.</td></tr>'}catch(e){$('rows').innerHTML=`<tr><td colspan="8" class="empty">${esc(e.message)}</td></tr>`}}
+$('fType').addEventListener('change',load);$('fSearch').addEventListener('input',E.debounce(load));
+</script>
+</body></html>

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b0b0f"><link rel="icon" href="/assets/endura-icon.png"><link rel="stylesheet" href="/admin/admin.css?v=1"><title>Endura · Socios</title></head>
+<body class="booting" data-page="partners">
+<div class="app"><main class="main">
+<div class="top">
+  <div><div class="eyebrow">Capital</div><h1 class="title">Socios</h1>
+  <p class="desc">Aportes en dinero y en especie, retiros y la participación de cada socio según lo aportado. Es una herramienta de gestión: los acuerdos formales de la sociedad mandan.</p></div>
+  <div class="topactions"><button id="newPartner" class="quiet hidden" type="button">＋ Socio</button><button id="newMove" class="primary hidden" type="button">＋ Movimiento de capital</button></div>
+</div>
+<div class="stats">
+  <div class="stat accent"><div class="statlabel">Capital aportado</div><div id="stTotal" class="statvalue">—</div><div id="stTotalFoot" class="statfoot">—</div></div>
+  <div class="stat"><div class="statlabel">En dinero</div><div id="stCash" class="statvalue">—</div></div>
+  <div class="stat"><div class="statlabel">En especie</div><div id="stKind" class="statvalue">—</div></div>
+  <div class="stat"><div class="statlabel">Retiros y reintegros</div><div id="stOut" class="statvalue">—</div></div>
+</div>
+<section class="panel"><div class="panelhead"><div><h2>Participación</h2><p>Aporte en dinero + especie sobre el total aportado.</p></div></div>
+  <div class="tablewrap"><table><thead><tr><th>Socio</th><th class="right">Dinero</th><th class="right">Especie</th><th class="right">Retiros</th><th class="right">Neto</th><th style="min-width:180px">Participación</th></tr></thead><tbody id="pRows"></tbody></table></div></section>
+<div class="cols2">
+  <section class="panel"><div class="panelhead"><div><h2>Movimientos</h2></div></div><div class="tablewrap"><table><thead><tr><th>Fecha</th><th>Socio</th><th>Tipo</th><th class="right">Valor</th><th></th></tr></thead><tbody id="mRows"></tbody></table></div></section>
+  <section class="panel"><div class="panelhead"><div><h2>Compras por quién financió</h2><p>Según el campo «Financia» de cada compra.</p></div></div><div class="panelbody" id="fundBox"></div></section>
+</div>
+</main></div>
+
+<div id="mBg" class="modalbg hidden"><section class="modal narrow" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+<div class="modalhead"><div><div class="eyebrow">Capital</div><h2 id="mTitle">Movimiento</h2></div><button class="close" type="button" data-close="mBg" aria-label="Cerrar">×</button></div>
+<form id="mForm" class="modalbody" novalidate>
+  <div class="field"><label for="mPartner">Socio *</label><select id="mPartner"></select></div>
+  <div class="grid2"><div class="field"><label for="mKind">Tipo *</label><select id="mKind"></select></div><div class="field"><label for="mDate">Fecha *</label><input id="mDate" type="date"></div></div>
+  <div class="field"><label for="mAmount">Valor (COP) *</label><input id="mAmount" type="number" min="1" step="1000"></div>
+  <div class="field"><label for="mNote">Nota</label><input id="mNote" maxlength="500" placeholder="Ej. producto aportado al inicio, reintegro de excedente"></div>
+  <div id="mError" class="error"></div><div class="modalactions"><button class="quiet" type="button" data-close="mBg">Cancelar</button><button id="mSave" class="primary" type="submit">Guardar</button></div>
+</form></section></div>
+
+<script src="/admin/app.js?v=1"></script>
+<script>
+const E=Endura,{$,esc,money}=E;let cat=null,data=null;
+E.start(async me=>{cat=await E.catalogs();const admin=me.role==='admin';$('newPartner').classList.toggle('hidden',!admin);$('newMove').classList.toggle('hidden',!admin);$('mKind').innerHTML=E.options(cat.capital_kinds,'cash');await load()});
+async function load(){data=await E.api('/partners');const s=data.summary;$('stTotal').textContent=money(s.contributed);$('stTotalFoot').textContent=`${data.partners.length} socio(s) · neto de retiros ${money(s.contributed-s.withdrawals)}`;$('stCash').textContent=money(s.cash);$('stKind').textContent=money(s.in_kind);$('stOut').textContent=money(s.withdrawals);
+  $('pRows').innerHTML=data.partners.length?data.partners.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td class="right">${money(p.cash)}</td><td class="right">${money(p.in_kind)}</td><td class="right">${money(p.withdrawals)}</td><td class="right"><strong>${money(p.net)}</strong></td>
+    <td><div style="display:flex;align-items:center;gap:10px"><div class="meter" style="flex:1"><span style="width:${p.share_pct}%"></span></div><strong class="num">${E.pct(p.share_pct)}</strong></div></td></tr>`).join(''):'<tr><td colspan="6" class="empty">Aún no hay socios.</td></tr>';
+  $('mRows').innerHTML=data.movements.length?data.movements.map(m=>`<tr><td class="nowrap">${E.fmtShort(m.movement_date)}</td><td>${esc(m.partner)}${m.note?`<div class="muted">${esc(m.note)}</div>`:''}</td><td><span class="pill ${m.kind==='withdrawal'?'warn':'violet'} plain">${esc(m.kind_label)}</span></td><td class="right">${m.kind==='withdrawal'?'− ':''}${money(m.amount)}</td><td>${E.me.role==='admin'?`<button class="tiny" data-void="${m.id}">Anular</button>`:''}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">Sin movimientos.</td></tr>';
+  $('fundBox').innerHTML=data.purchases_by_funder.map(f=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--line-soft)"><span>${esc(f.name||'Sin indicar')}</span><strong class="num">${money(f.total)}</strong></div>`).join('')||'<p class="hint">Sin compras.</p>';
+  $('mPartner').innerHTML=data.partners.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}
+$('newPartner').addEventListener('click',async()=>{const name=await E.confirm({title:'Nuevo socio',text:'Nombre como aparecerá en los informes.',ok:'Crear',withReason:true,placeholder:'Nombre'});if(!name)return;try{await E.post('/partners',{name});E.toast('Socio creado');load()}catch(e){E.toast(e.message)}});
+$('newMove').addEventListener('click',()=>{if(!data.partners.length){E.toast('Crea primero un socio');return}$('mForm').reset();$('mError').textContent='';$('mDate').value=E.today();$('mDate').max=E.today();E.openModal('mBg','mAmount')});
+$('mForm').addEventListener('submit',async e=>{e.preventDefault();$('mError').textContent='';if(!(Number($('mAmount').value)>0)){$('mError').textContent='Indica el valor.';return}
+  $('mSave').disabled=true;try{await E.post('/capital',{partner_id:Number($('mPartner').value),movement_date:$('mDate').value,kind:$('mKind').value,amount:Number($('mAmount').value),note:$('mNote').value.trim()});E.closeModal('mBg');E.toast('Movimiento registrado');load()}catch(err){$('mError').textContent=err.message}finally{$('mSave').disabled=false}});
+$('mRows').addEventListener('click',async e=>{const b=e.target.closest('[data-void]');if(!b)return;if(!(await E.confirm({title:'Anular movimiento',text:'Deja de contar en los aportes. Úsalo para corregir un error.',ok:'Anular',danger:true})))return;try{await E.del('/capital/'+b.dataset.void);load()}catch(err){E.toast(err.message)}});
+</script>
+</body></html>

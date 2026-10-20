@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b0b0f"><link rel="icon" href="/assets/endura-icon.png"><link rel="stylesheet" href="/admin/admin.css?v=1"><title>Endura · Compras</title>
+<style>.pline{grid-template-columns:minmax(0,2.4fr) 80px 120px 140px 110px auto}@media(max-width:820px){.pline{grid-template-columns:1fr 1fr}.pline .prodcell{grid-column:1/-1}}</style></head>
+<body class="booting" data-page="purchases">
+<div class="app"><main class="main">
+<div class="top">
+  <div><div class="eyebrow">Abastecimiento</div><h1 class="title">Compras</h1>
+  <p class="desc">Pedidos a marcas y tiendas, nacionales o importados. Al recibir, cada producto entra como un lote con su vencimiento y su costo aterrizado: precio × tasa de cambio, más envío e impuestos repartidos según el valor de cada línea.</p></div>
+  <div class="topactions"><button id="newBtn" class="primary" type="button">＋ Nueva compra</button></div>
+</div>
+<div class="stats">
+  <div class="stat accent"><div class="statlabel">Compras del periodo</div><div id="stTotal" class="statvalue">—</div><div id="stCount" class="statfoot">—</div></div>
+  <div class="stat alert"><div class="statlabel">Pendiente por recibir</div><div id="stPending" class="statvalue">—</div><div class="statfoot">Pedidas que aún no llegan a bodega</div></div>
+  <div class="stat"><div class="statlabel">Quién financió</div><div id="stFunders" class="statfoot" style="font-size:13.5px;margin-top:10px">—</div></div>
+</div>
+<section class="panel">
+  <div class="panelhead"><div><h2>Pedidos</h2><p>Las compras traídas del Excel quedan como historial (sin detalle por producto).</p></div>
+    <div class="filters"><input id="fMonth" class="filter" type="month" aria-label="Mes">
+      <select id="fStatus" class="filter" aria-label="Estado"><option value="all">Todos los estados</option><option value="ordered">Pedidas</option><option value="received">Recibidas</option><option value="cancelled">Canceladas</option></select>
+      <input id="fSearch" class="search" type="search" placeholder="Proveedor, socio, factura, guía…" aria-label="Buscar"></div></div>
+  <div class="tablewrap"><table><thead><tr><th>Compra</th><th>Proveedor</th><th>Financió</th><th class="right">Unidades</th><th class="right">Total COP</th><th>Estado</th><th></th></tr></thead>
+  <tbody id="rows"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody></table></div>
+</section>
+</main></div>
+<datalist id="dlFunders"></datalist><datalist id="dlSuppliers"></datalist>
+
+<div id="pBg" class="modalbg hidden"><section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="pTitle">
+<div class="modalhead"><div><div class="eyebrow">Compras · Pedido</div><h2 id="pTitle">Nueva compra</h2></div><button class="close" type="button" data-close="pBg" aria-label="Cerrar">×</button></div>
+<form id="pForm" class="modalbody" novalidate>
+  <div class="grid3">
+    <div class="field"><label for="fDate">Fecha *</label><input id="fDate" type="date"></div>
+    <div class="field"><label for="fSupplier">Proveedor / tienda *</label><input id="fSupplier" list="dlSuppliers" maxlength="120" placeholder="Ej. Maurten, Grafam, Going"></div>
+    <div class="field"><label for="fFunded">Financia</label><input id="fFunded" list="dlFunders" maxlength="80" placeholder="Socio o Recompra (caja)"></div>
+    <div class="field"><label for="fOrigin">Origen</label><input id="fOrigin" maxlength="60" placeholder="USA, Medellín, Bogotá…"></div>
+    <div class="field"><label for="fCurrency">Moneda de la factura</label><select id="fCurrency"><option value="COP">Pesos (COP)</option><option value="USD">Dólares (USD)</option><option value="EUR">Euros (EUR)</option><option value="GBP">Libras (GBP)</option></select></div>
+    <div class="field" id="fxWrap"><label for="fFx">Tasa de cambio (COP)</label><input id="fFx" type="number" min="1" step="0.01" placeholder="Ej. 3720"><span class="hint">La del cobro de la tarjeta o el banco.</span></div>
+    <div class="field"><label for="fInvoice">N.º de factura / pedido</label><input id="fInvoice" maxlength="80"></div>
+    <div class="field"><label for="fCarrier">Transportadora / casillero</label><input id="fCarrier" maxlength="80" placeholder="Deblex, DHL, Coordinadora…"></div>
+    <div class="field"><label for="fTracking">Guía</label><input id="fTracking" maxlength="120"></div>
+    <div class="field"><label for="fShip">Envío / casillero (COP)</label><input id="fShip" type="number" min="0" step="100" value="0"></div>
+    <div class="field"><label for="fOther">Impuestos y otros (COP)</label><input id="fOther" type="number" min="0" step="100" value="0"></div>
+  </div>
+  <div class="linehead"><strong>Productos</strong><button id="addLine" class="quiet" type="button">＋ Añadir producto</button></div>
+  <div id="lines"></div>
+  <div class="field"><label for="fNote">Nota</label><input id="fNote" maxlength="1000" placeholder="Ej. descuento del 20% por primera compra"></div>
+  <div id="pSummary" class="summarybox"></div>
+  <div id="pError" class="error"></div>
+  <div class="modalactions"><button class="quiet" type="button" data-close="pBg">Cancelar</button><button id="pSave" class="primary" type="submit">Guardar pedido</button></div>
+</form></section></div>
+
+<div id="detBg" class="modalbg hidden"><section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="detTitle">
+<div class="modalhead"><div><div class="eyebrow">Compras · Detalle</div><h2 id="detTitle">—</h2><p id="detSub" class="hint" style="margin:0"></p></div><button class="close" type="button" data-close="detBg" aria-label="Cerrar">×</button></div>
+<form id="recvForm" class="modalbody" novalidate><div id="detBody"></div><div id="detError" class="error"></div>
+  <div class="modalactions"><button id="unrecvBtn" class="danger-btn hidden" type="button">Revertir recepción</button><button id="cancelBtn" class="danger-btn hidden" type="button">Cancelar pedido</button><button id="editBtn" class="quiet hidden" type="button">Editar</button><button id="recvBtn" class="primary hidden" type="submit">Recibir en bodega</button></div>
+</form></section></div>
+
+<script src="/admin/app.js?v=1"></script>
+<script>
+const E=Endura,{$,esc,money,int}=E;let products=[],rows=[],current=null,editing=null;
+const ST={ordered:['warn','Pedida'],received:['ok','Recibida'],cancelled:['bad','Cancelada']};
+const monthToDate=E.monthEnd;
+E.start(async()=>{$('fMonth').value='';const [opt,partners]=await Promise.all([E.api('/sales/options'),E.api('/partners')]);products=opt.products;
+  $('dlFunders').innerHTML=['Recompra',...partners.partners.map(p=>p.name)].map(n=>`<option value="${esc(n)}">`).join('');await load()});
+async function load(){const p=new URLSearchParams({month:$('fMonth').value,status:$('fStatus').value,search:$('fSearch').value.trim()});
+  try{const d=await E.api('/purchases?'+p);rows=d.items;const s=d.summary;$('stTotal').textContent=money(s.total);$('stCount').textContent=`${s.count} compra(s) · ${$('fMonth').value?E.fmtMonthLong($('fMonth').value):'todo el historial'}`;$('stPending').textContent=money(s.pending);
+  $('stFunders').innerHTML=s.by_funder.slice(0,5).map(f=>`<div style="display:flex;justify-content:space-between;gap:10px"><span>${esc(f.name)}</span><strong class="num">${money(f.total)}</strong></div>`).join('')||'—';
+  $('dlSuppliers').innerHTML=[...new Set(rows.map(r=>r.supplier))].map(n=>`<option value="${esc(n)}">`).join('');render()}catch(e){$('rows').innerHTML=`<tr><td colspan="7" class="empty">${esc(e.message)}</td></tr>`}}
+function render(){if(!rows.length){$('rows').innerHTML='<tr><td colspan="7" class="empty"><strong>Sin compras con estos filtros</strong></td></tr>';return}
+  $('rows').innerHTML=rows.map(r=>`<tr class="${r.status==='cancelled'?'voided':''}"><td class="nowrap"><strong>#${r.id}</strong><div class="muted">${E.fmtShort(r.purchase_date)}</div></td>
+  <td><strong>${esc(r.supplier)}</strong><div class="muted">${esc([r.origin,r.carrier].filter(Boolean).join(' · '))}</div></td><td>${esc(r.funded_by||'—')}</td>
+  <td class="right">${r.imported?'<span class="muted">—</span>':int(r.units)}</td><td class="right nowrap"><strong>${money(r.total_cop)}</strong>${r.currency!=='COP'?`<div class="muted">${r.currency} × ${Number(r.fx_rate).toLocaleString('es-CO')}</div>`:''}</td>
+  <td><span class="pill ${ST[r.status][0]}">${ST[r.status][1]}</span>${r.imported?'<div class="muted">Excel</div>':''}</td><td><button class="tiny" data-id="${r.id}">Ver</button></td></tr>`).join('')}
+
+// ---------- Formulario ----------
+function productOptions(sel){return '<option value="">Elige un producto…</option>'+products.map(p=>`<option value="${p.id}" ${String(p.id)===String(sel)?'selected':''}>${esc(p.name)} · ${esc(p.brand)} (${esc(p.sku)})</option>`).join('')}
+function addLine(it){const div=document.createElement('div');div.className='line pline';const n=$('lines').children.length;
+  div.innerHTML=`<div class="prodcell"><label for="lp${n}">Producto</label><select id="lp${n}" class="lp">${productOptions(it?.product_id)}</select></div><div><label for="lq${n}">Cant.</label><input id="lq${n}" class="lq" type="number" min="1" step="1" value="${it?.quantity??1}"></div>
+  <div><label for="lu${n}">Precio unit. <span class="cur"></span></label><input id="lu${n}" class="lu" type="number" min="0" step="0.01" value="${it?.unit_price!=null?Number(it.unit_price):''}"></div><div><label for="le${n}">Vence</label><input id="le${n}" class="le" type="month" value="${it?.expiry_date?String(it.expiry_date).slice(0,7):''}"></div>
+  <div><label>Costo aterrizado</label><div class="val ll">—</div></div><button class="tiny lr" type="button">Quitar</button>`;
+  div.querySelector('.lr').addEventListener('click',()=>{if($('lines').children.length>1){div.remove();recalc()}});$('lines').appendChild(div)}
+function readLines(){return [...$('lines').querySelectorAll('.pline')].map(el=>({product_id:Number(el.querySelector('.lp').value),quantity:Number(el.querySelector('.lq').value),unit_price:el.querySelector('.lu').value===''?NaN:Number(el.querySelector('.lu').value),expiry_date:monthToDate(el.querySelector('.le').value),el}))}
+function recalc(){const cur=$('fCurrency').value;$('fxWrap').classList.toggle('hidden',cur==='COP');document.querySelectorAll('.cur').forEach(s=>s.textContent=`(${cur})`);
+  const fx=cur==='COP'?1:Number($('fFx').value||0),ship=Number($('fShip').value||0),oth=Number($('fOther').value||0),ls=readLines();
+  const goods=ls.reduce((a,l)=>a+(l.quantity>0&&l.unit_price>=0?l.quantity*l.unit_price*fx:0),0),units=ls.reduce((a,l)=>a+(l.quantity>0?l.quantity:0),0);
+  ls.forEach(l=>{const line=l.quantity*l.unit_price*fx;const share=goods>0?(ship+oth)*line/goods:(units?(ship+oth)*l.quantity/units:0);l.el.querySelector('.ll').textContent=l.quantity>0&&l.unit_price>=0&&fx?money((line+share)/l.quantity):'—'});
+  $('pSummary').innerHTML=`<div class="totals">${cur!=='COP'?`<span>Productos (${cur})</span><span>${E.fx(ls.reduce((a,l)=>a+(l.quantity*l.unit_price||0),0),cur)}</span>`:''}<span>Productos en pesos</span><span>${money(goods)}</span><span>Envío, impuestos y otros</span><span>${money(ship+oth)}</span><span class="big">Total de la compra</span><span class="big">${money(goods+ship+oth)}</span></div>`}
+function openForm(p){editing=p||null;$('pForm').reset();$('pError').textContent='';$('lines').innerHTML='';$('pTitle').textContent=p?`Editar compra #${p.id}`:'Nueva compra';$('fDate').max=E.today();
+  if(p){$('fDate').value=p.purchase_date;$('fSupplier').value=p.supplier;$('fFunded').value=p.funded_by;$('fOrigin').value=p.origin;$('fCurrency').value=p.currency;$('fFx').value=p.currency==='COP'?'':Number(p.fx_rate);$('fInvoice').value=p.invoice_no;$('fCarrier').value=p.carrier;$('fTracking').value=p.tracking;$('fShip').value=Number(p.shipping_cost);$('fOther').value=Number(p.other_costs);$('fNote').value=p.note;p.items.forEach(addLine)}
+  else{$('fDate').value=E.today();addLine()}recalc();E.openModal('pBg','fSupplier')}
+$('newBtn').addEventListener('click',()=>openForm(null));$('addLine').addEventListener('click',()=>{addLine();recalc()});$('pForm').addEventListener('input',recalc);$('pForm').addEventListener('change',recalc);
+$('pForm').addEventListener('submit',async e=>{e.preventDefault();$('pError').textContent='';const ls=readLines(),cur=$('fCurrency').value;
+  if(!$('fSupplier').value.trim()){$('pError').textContent='Indica el proveedor.';return}if(cur!=='COP'&&!(Number($('fFx').value)>0)){$('pError').textContent='Indica la tasa de cambio.';return}
+  if(ls.some(l=>!l.product_id)){$('pError').textContent='Elige el producto en cada línea o quita las vacías.';return}if(new Set(ls.map(l=>l.product_id)).size!==ls.length){$('pError').textContent='Hay un producto repetido.';return}
+  if(ls.some(l=>!Number.isInteger(l.quantity)||l.quantity<=0||!(l.unit_price>=0))){$('pError').textContent='Revisa cantidades (enteras) y precios.';return}
+  const body={purchase_date:$('fDate').value,supplier:$('fSupplier').value.trim(),funded_by:$('fFunded').value.trim(),origin:$('fOrigin').value.trim(),currency:cur,fx_rate:cur==='COP'?1:Number($('fFx').value),
+    invoice_no:$('fInvoice').value.trim(),carrier:$('fCarrier').value.trim(),tracking:$('fTracking').value.trim(),shipping_cost:Number($('fShip').value||0),other_costs:Number($('fOther').value||0),note:$('fNote').value.trim(),
+    items:ls.map(({product_id,quantity,unit_price,expiry_date})=>({product_id,quantity,unit_price,expiry_date}))};
+  $('pSave').disabled=true;try{const r=editing?await E.patch('/purchases/'+editing.id,body):await E.post('/purchases',body);E.closeModal('pBg');E.toast(`Compra #${r.id} guardada · ${money(r.total_cop)}`);await load();openDetail(r.id)}
+  catch(err){$('pError').textContent=err.message}finally{$('pSave').disabled=false}});
+
+// ---------- Detalle y recepción ----------
+$('rows').addEventListener('click',e=>{const b=e.target.closest('button[data-id]');if(b)openDetail(b.dataset.id)});
+async function openDetail(id){try{const p=await E.api('/purchases/'+id);current=p;const ordered=p.status==='ordered';
+  $('detTitle').textContent=`Compra #${p.id} · ${p.supplier}`;$('detSub').textContent=`${E.fmtDate(p.purchase_date)} · ${ST[p.status][1]}${p.received_at?' el '+E.fmtDate(p.received_at):''}${p.imported?' · importada del Excel':''}`;
+  $('detBody').innerHTML=`<div class="detailgrid"><div><span>Financió</span>${esc(p.funded_by||'—')}</div><div><span>Origen</span>${esc(p.origin||'—')}</div><div><span>Factura</span>${esc(p.invoice_no||'—')}</div>
+    <div><span>Transporte</span>${esc(p.carrier||'—')}${p.tracking?`<div class="muted">Guía ${esc(p.tracking)}</div>`:''}</div>${p.currency!=='COP'?`<div><span>Tasa</span>${p.currency} × ${Number(p.fx_rate).toLocaleString('es-CO')}</div>`:''}${p.note?`<div><span>Nota</span>${esc(p.note)}</div>`:''}</div>
+    ${p.items.length?`<div class="minitable tablewrap"><table><thead><tr><th>Producto</th><th class="right">Cant.</th><th class="right">Precio (${p.currency})</th><th>Vence</th><th class="right">Costo aterrizado</th></tr></thead><tbody>${p.items.map(i=>`<tr><td><strong>${esc(i.name)}</strong><div class="muted">${esc(i.sku)} · ${esc(i.brand)}</div></td><td class="right">${i.quantity}</td><td class="right">${E.fx(i.unit_price,p.currency)}</td>
+      <td>${ordered?`<input type="month" class="filter" data-item="${i.id}" value="${i.expiry_date?String(i.expiry_date).slice(0,7):''}" aria-label="Vencimiento" style="min-height:34px">`:E.expiryPill(i.expiry_date)}</td><td class="right">${i.landed_unit_cost!=null?money(i.landed_unit_cost):'<span class="muted">al recibir</span>'}</td></tr>`).join('')}</tbody></table></div>`
+      :'<p class="hint">Compra histórica sin detalle por producto: sus unidades ya están en el saldo inicial del inventario.</p>'}
+    <div class="summarybox" style="margin-top:12px"><div class="totals"><span>Productos en pesos</span><span>${money(p.goods_total)}</span><span>Envío</span><span>${money(p.shipping_cost)}</span><span>Impuestos y otros</span><span>${money(p.other_costs)}</span><span class="big">Total</span><span class="big">${money(p.total_cop)}</span></div></div>
+    ${ordered?'<p class="hint">Revisa la fecha de vencimiento impresa de cada producto antes de recibir.</p>':''}`;
+  $('detError').textContent='';$('recvBtn').classList.toggle('hidden',!ordered);$('editBtn').classList.toggle('hidden',!ordered);$('cancelBtn').classList.toggle('hidden',!ordered);
+  $('unrecvBtn').classList.toggle('hidden',!(p.status==='received'&&!p.imported&&E.me.role==='admin'));E.openModal('detBg')}catch(err){E.toast(err.message)}}
+$('recvForm').addEventListener('submit',async e=>{e.preventDefault();$('detError').textContent='';const items=[...$('detBody').querySelectorAll('[data-item]')].map(i=>({id:Number(i.dataset.item),expiry_date:monthToDate(i.value)}));
+  const missing=items.filter(i=>!i.expiry_date).length;if(missing&&!(await E.confirm({title:'Productos sin vencimiento',text:`${missing} producto(s) no tienen fecha de vencimiento. ¿Recibir igual?`,ok:'Recibir'})))return;
+  $('recvBtn').disabled=true;try{await E.post(`/purchases/${current.id}/receive`,{items});E.toast(`Compra #${current.id} recibida: el inventario se actualizó`);await load();openDetail(current.id)}catch(err){$('detError').textContent=err.message}finally{$('recvBtn').disabled=false}});
+$('editBtn').addEventListener('click',()=>{E.closeModal('detBg');openForm(current)});
+$('cancelBtn').addEventListener('click',async()=>{if(!(await E.confirm({title:`Cancelar compra #${current.id}`,text:'El pedido queda como cancelado y no suma en los totales.',ok:'Cancelar pedido',danger:true})))return;
+  try{const r=await E.post(`/purchases/${current.id}/cancel`);E.closeModal('detBg');E.toast(r.message);load()}catch(err){$('detError').textContent=err.message}});
+$('unrecvBtn').addEventListener('click',async()=>{if(!(await E.confirm({title:'Revertir recepción',text:'Retira del inventario los lotes de esta compra y la deja como pedida. Solo es posible si aún no se ha movido ninguna unidad.',ok:'Revertir',danger:true})))return;
+  try{await E.post(`/purchases/${current.id}/unreceive`);E.toast('Recepción revertida');await load();openDetail(current.id)}catch(err){$('detError').textContent=err.message}});
+['fMonth','fStatus'].forEach(id=>$(id).addEventListener('change',load));$('fSearch').addEventListener('input',E.debounce(load));
+</script>
+</body></html>

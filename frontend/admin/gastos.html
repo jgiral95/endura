@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b0b0f"><link rel="icon" href="/assets/endura-icon.png"><link rel="stylesheet" href="/admin/admin.css?v=1"><title>Endura · Gastos</title></head>
+<body class="booting" data-page="expenses">
+<div class="app"><main class="main">
+<div class="top">
+  <div><div class="eyebrow">Operación</div><h1 class="title">Gastos</h1>
+  <p class="desc">Domicilios, transportadoras, redes, marketing, empaques, impuestos y plataformas. El producto comprado y sus fletes de importación no van aquí: se registran en Compras y llegan a los resultados como costo de lo vendido.</p></div>
+  <div class="topactions"><button id="newBtn" class="primary" type="button">＋ Registrar gasto</button></div>
+</div>
+<div class="stats">
+  <div class="stat accent"><div class="statlabel">Gastos del periodo</div><div id="stTotal" class="statvalue">—</div><div id="stCount" class="statfoot">—</div></div>
+  <div class="stat" style="grid-column:span 2"><div class="statlabel">Por categoría</div><div id="stCats" style="margin-top:10px">—</div></div>
+</div>
+<section class="panel">
+  <div class="panelhead"><div><h2>Registro</h2><p>Solo un administrador corrige o anula gastos; los anulados se conservan.</p></div>
+    <div class="filters"><input id="fMonth" class="filter" type="month" aria-label="Mes"><select id="fCat" class="filter" aria-label="Categoría"></select>
+      <input id="fSearch" class="search" type="search" placeholder="Descripción, quién pagó…" aria-label="Buscar"></div></div>
+  <div class="tablewrap"><table><thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Pagó</th><th class="right">Valor</th><th></th></tr></thead>
+  <tbody id="rows"><tr><td colspan="6" class="empty">Cargando…</td></tr></tbody></table></div>
+</section>
+</main></div>
+
+<div id="xBg" class="modalbg hidden"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="xTitle">
+<div class="modalhead"><div><div class="eyebrow">Gastos</div><h2 id="xTitle">Registrar gasto</h2></div><button class="close" type="button" data-close="xBg" aria-label="Cerrar">×</button></div>
+<form id="xForm" class="modalbody" novalidate><div class="grid2">
+  <div class="field"><label for="xDate">Fecha *</label><input id="xDate" type="date"></div>
+  <div class="field"><label for="xCat">Categoría *</label><select id="xCat"></select></div>
+  <div class="field span2"><label for="xDesc">Descripción *</label><input id="xDesc" maxlength="200" placeholder="Ej. Domicilio a Envigado, pauta Instagram octubre"></div>
+  <div class="field"><label for="xAmount">Valor (COP) *</label><input id="xAmount" type="number" min="1" step="100"></div>
+  <div class="field"><label for="xPaidBy">Pagó</label><input id="xPaidBy" list="dlPaid" maxlength="80" placeholder="Caja, socio, mensajero…"></div>
+  <div class="field"><label for="xMethod">Medio</label><select id="xMethod"></select></div>
+  <div class="field"><label for="xNote">Nota</label><input id="xNote" maxlength="1000"></div></div>
+  <div id="xError" class="error"></div>
+  <div class="modalactions"><button id="xVoid" class="danger-btn hidden" type="button">Anular gasto</button><button class="quiet" type="button" data-close="xBg">Cancelar</button><button id="xSave" class="primary" type="submit">Guardar</button></div>
+</form></section></div>
+<datalist id="dlPaid"></datalist>
+
+<script src="/admin/app.js?v=1"></script>
+<script>
+const E=Endura,{$,esc,money}=E;let cat=null,rows=[],editing=null;
+E.start(async()=>{cat=await E.catalogs();$('fMonth').value=E.thisMonth();$('fCat').innerHTML='<option value="all">Todas las categorías</option>'+E.options(cat.expense_categories);
+  $('xCat').innerHTML=E.options(cat.expense_categories,'delivery');$('xMethod').innerHTML=E.options(cat.payment_methods,'bancolombia');await load()});
+async function load(){const p=new URLSearchParams({month:$('fMonth').value,category:$('fCat').value,search:$('fSearch').value.trim()});
+  try{const d=await E.api('/expenses?'+p);rows=d.items;const s=d.summary;$('stTotal').textContent=money(s.total);$('stCount').textContent=`${s.count} gasto(s) · ${$('fMonth').value?E.fmtMonthLong($('fMonth').value):'todo el historial'}`;
+  const max=Math.max(1,...s.by_category.map(c=>Number(c.total)));
+  $('stCats').innerHTML=s.by_category.length?s.by_category.map(c=>`<div style="display:grid;grid-template-columns:minmax(120px,1fr) 2fr auto;gap:10px;align-items:center;font-size:13.5px;margin:4px 0"><span>${esc(c.label)}</span><div class="meter"><span style="width:${Number(c.total)/max*100}%"></span></div><strong class="num">${money(c.total)}</strong></div>`).join(''):'<span class="hint">Sin gastos en el periodo.</span>';
+  $('dlPaid').innerHTML=[...new Set(rows.map(r=>r.paid_by).filter(Boolean))].map(n=>`<option value="${esc(n)}">`).join('');render()}catch(e){$('rows').innerHTML=`<tr><td colspan="6" class="empty">${esc(e.message)}</td></tr>`}}
+function render(){if(!rows.length){$('rows').innerHTML='<tr><td colspan="6" class="empty"><strong>Sin gastos con estos filtros</strong></td></tr>';return}
+  $('rows').innerHTML=rows.map(r=>`<tr><td class="nowrap">${E.fmtShort(r.expense_date)}</td><td><strong>${esc(r.description)}</strong>${r.note?`<div class="muted">${esc(r.note)}</div>`:''}</td><td><span class="tag">${esc(r.category_label)}</span></td>
+  <td>${esc(r.paid_by||'—')}<div class="muted">${esc(r.method_label)}</div></td><td class="right"><strong>${money(r.amount)}</strong></td><td>${E.me.role==='admin'?`<button class="tiny" data-id="${r.id}">Editar</button>`:''}</td></tr>`).join('')}
+function openForm(x){editing=x||null;$('xForm').reset();$('xError').textContent='';$('xTitle').textContent=x?'Editar gasto':'Registrar gasto';$('xDate').max=E.today();$('xVoid').classList.toggle('hidden',!x);
+  if(x){$('xDate').value=x.expense_date;$('xCat').value=x.category;$('xDesc').value=x.description;$('xAmount').value=Number(x.amount);$('xPaidBy').value=x.paid_by;$('xMethod').value=x.payment_method;$('xNote').value=x.note}else $('xDate').value=E.today();E.openModal('xBg','xDesc')}
+$('newBtn').addEventListener('click',()=>openForm(null));$('rows').addEventListener('click',e=>{const b=e.target.closest('button[data-id]');if(b)openForm(rows.find(r=>r.id==b.dataset.id))});
+$('xForm').addEventListener('submit',async e=>{e.preventDefault();$('xError').textContent='';if($('xDesc').value.trim().length<2||!(Number($('xAmount').value)>0)){$('xError').textContent='Describe el gasto e indica el valor.';return}
+  const body={expense_date:$('xDate').value,category:$('xCat').value,description:$('xDesc').value.trim(),amount:Number($('xAmount').value),paid_by:$('xPaidBy').value.trim(),payment_method:$('xMethod').value,note:$('xNote').value.trim()};
+  $('xSave').disabled=true;try{editing?await E.patch('/expenses/'+editing.id,body):await E.post('/expenses',body);E.closeModal('xBg');E.toast(editing?'Gasto actualizado':`Gasto de ${money(body.amount)} registrado`);load()}catch(err){$('xError').textContent=err.message}finally{$('xSave').disabled=false}});
+$('xVoid').addEventListener('click',async()=>{const reason=await E.confirm({title:'Anular gasto',text:`${editing.description} · ${money(editing.amount)}`,ok:'Anular',danger:true,withReason:true});if(!reason)return;
+  try{const r=await E.post(`/expenses/${editing.id}/void`,{reason});E.closeModal('xBg');E.toast(r.message);load()}catch(err){$('xError').textContent=err.message}});
+['fMonth','fCat'].forEach(id=>$(id).addEventListener('change',load));$('fSearch').addEventListener('input',E.debounce(load));
+</script>
+</body></html>

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b0b0f"><link rel="icon" href="/assets/endura-icon.png"><link rel="stylesheet" href="/admin/admin.css?v=1"><title>Endura Human · Ingresar</title></head>
+<body class="booting">
+<div class="loginwrap">
+  <section class="art">
+    <img class="logo" src="/assets/endura-logo.png" alt="Endura Human">
+    <div class="artnote">
+      <div class="eyebrow" style="color:var(--orange)">Panel de gestión</div>
+      <h2>Combustible para <em>la distancia</em>. Control para el negocio.</h2>
+      <p>Inventario por lote y vencimiento, ventas y cartera, patrocinios, compras, gastos y resultados de Endura en un solo lugar.</p>
+    </div>
+    <div class="artfoot">ENDURA HUMAN · SUPLEMENTACIÓN DE RESISTENCIA</div>
+  </section>
+  <section class="loginside">
+    <form id="loginForm" class="loginform" novalidate>
+      <div class="eyebrow">Acceso del equipo</div>
+      <h1>Ingresar</h1>
+      <p class="intro">Usa la cuenta que te asignó un administrador.</p>
+      <div class="field"><label for="u">Usuario</label><input id="u" autocomplete="username" required></div>
+      <div class="field"><label for="p">Contraseña</label><input id="p" type="password" autocomplete="current-password" required></div>
+      <div id="err" class="error" role="alert"></div>
+      <button id="go" class="primary" type="submit">Entrar al panel</button>
+    </form>
+  </section>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const next=()=>{const n=new URLSearchParams(location.search).get('next')||'/admin/';return n.startsWith('/admin/')&&!n.startsWith('//')?n:'/admin/'};
+fetch('/api/auth/me',{credentials:'same-origin'}).then(r=>{if(r.ok)location.replace(next());else{document.body.classList.remove('booting');$('u').focus()}}).catch(()=>{document.body.classList.remove('booting')});
+$('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('err').textContent='';if(!$('u').value.trim()||!$('p').value){$('err').textContent='Escribe usuario y contraseña.';return}
+$('go').disabled=true;try{const f=new FormData();f.append('username',$('u').value.trim());f.append('password',$('p').value);
+const r=await fetch('/api/auth/login',{method:'POST',body:f,credentials:'same-origin'});const d=await r.json().catch(()=>({}));
+if(!r.ok)throw Error(d.detail||'No se pudo iniciar sesión');location.replace(next())}catch(err){$('err').textContent=err.message}finally{$('go').disabled=false}});
+</script>
+</body></html>

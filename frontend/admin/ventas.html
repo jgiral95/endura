@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b0b0f"><link rel="icon" href="/assets/endura-icon.png"><link rel="stylesheet" href="/admin/admin.css?v=1"><title>Endura · Ventas</title>
+<style>.saleline{grid-template-columns:minmax(0,2.6fr) 80px 120px 110px auto}@media(max-width:760px){.saleline{grid-template-columns:1fr 1fr}.saleline .prodcell{grid-column:1/-1}}</style></head>
+<body class="booting" data-page="sales">
+<div class="app"><main class="main">
+<div class="top">
+  <div><div class="eyebrow">Del gel al atleta</div><h1 class="title">Ventas</h1>
+  <p class="desc">Registra cada venta con su descuento, domicilio y pago. El inventario se descuenta al guardar, empezando por lo que vence antes, y lo que falte por cobrar queda en cartera.</p></div>
+  <div class="topactions"><button id="newSale" class="primary" type="button">＋ Registrar venta</button></div>
+</div>
+<div class="stats">
+  <div class="stat accent"><div class="statlabel">Ventas del periodo</div><div id="stCount" class="statvalue">—</div><div id="stUnits" class="statfoot">—</div></div>
+  <div class="stat"><div class="statlabel">Ingreso neto</div><div id="stNet" class="statvalue">—</div><div id="stNetFoot" class="statfoot">—</div></div>
+  <div class="stat"><div class="statlabel">Margen bruto</div><div id="stMargin" class="statvalue">—</div><div id="stMarginFoot" class="statfoot">—</div></div>
+  <div class="stat alert"><div class="statlabel">Cartera por cobrar</div><div id="stDue" class="statvalue">—</div><div id="stDueFoot" class="statfoot">—</div></div>
+</div>
+<section class="panel">
+  <div class="panelhead"><div><h2>Registro de ventas</h2><p>Las ventas anuladas se conservan, pero no suman.</p></div>
+    <div class="filters">
+      <input id="fMonth" class="filter" type="month" aria-label="Mes">
+      <select id="fPay" class="filter" aria-label="Pago"><option value="all">Todas</option><option value="due">Por cobrar</option><option value="paid">Pagadas</option></select>
+      <select id="fStatus" class="filter" aria-label="Estado"><option value="all">Vigentes y anuladas</option><option value="completed">Vigentes</option><option value="voided">Anuladas</option></select>
+      <input id="fSearch" class="search" type="search" placeholder="N.º, cliente, producto, vendedor…" aria-label="Buscar">
+    </div></div>
+  <div class="tablewrap"><table><thead><tr><th>Venta</th><th>Cliente</th><th>Productos</th><th class="right">Total</th><th>Pago</th><th class="right">Margen</th><th></th></tr></thead>
+  <tbody id="rows"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody></table></div>
+  <div id="count" class="statusline">—</div>
+</section>
+</main></div>
+
+<datalist id="dlCustomers"></datalist><datalist id="dlReferrers"></datalist>
+
+<!-- Registrar -->
+<div id="saleBg" class="modalbg hidden"><section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="saleTitle">
+<div class="modalhead"><div><div class="eyebrow">Ventas · Registro</div><h2 id="saleTitle">Registrar venta</h2></div><button class="close" type="button" data-close="saleBg" aria-label="Cerrar">×</button></div>
+<form id="saleForm" class="modalbody" novalidate>
+  <div class="grid3">
+    <div class="field"><label for="sDate">Fecha *</label><input id="sDate" type="date" required></div>
+    <div class="field"><label for="sCustomer">Cliente</label><input id="sCustomer" list="dlCustomers" maxlength="160" autocomplete="off" placeholder="Nombre de quien compra"></div>
+    <div class="field"><label for="sContact">Contacto</label><input id="sContact" maxlength="160" autocomplete="off" placeholder="Celular o @usuario"></div>
+  </div>
+  <details class="more"><summary>Datos para la factura (documento, dirección, ciudad)</summary><div class="grid3">
+    <div class="field"><label for="sDoc">CC / NIT</label><input id="sDoc" maxlength="40"></div>
+    <div class="field"><label for="sAddress">Dirección</label><input id="sAddress" maxlength="200"></div>
+    <div class="field"><label for="sCity">Ciudad</label><input id="sCity" maxlength="80"></div></div></details>
+  <div class="linehead"><strong>Productos</strong><button id="addLine" class="quiet" type="button">＋ Añadir producto</button></div>
+  <div id="lines"></div>
+  <div class="grid3" style="margin-top:6px">
+    <div class="field"><label for="sPct">Descuento %</label><input id="sPct" type="number" min="0" max="100" step="0.1" value="0"></div>
+    <div class="field"><label for="sDisc">Descuento (COP)</label><input id="sDisc" type="number" min="0" step="100" value="0"><span class="hint">Escribe el % o el valor: el otro se calcula.</span></div>
+    <div class="field"><label for="sDelivery">Domicilio cobrado</label><input id="sDelivery" type="number" min="0" step="500" value="0"></div>
+    <div class="field"><label for="sReferrer">Vendió / recomendó</label><input id="sReferrer" list="dlReferrers" maxlength="80" placeholder="Ej. Jardín, Juanes, Instagram"></div>
+    <div class="field"><label for="sDeliv">Entrega</label><select id="sDeliv"><option value="delivered">Entregado</option><option value="pending">Por entregar</option></select></div>
+    <div class="field"><label for="sNote">Nota</label><input id="sNote" maxlength="1000" placeholder="Código de descuento, observaciones…"></div>
+  </div>
+  <fieldset class="fieldset"><legend>Pago</legend><div class="grid3">
+    <div class="field"><label for="sPaid">Valor recibido</label><input id="sPaid" type="number" min="0" step="100"><span class="hint">Déjalo en 0 si queda por cobrar.</span></div>
+    <div class="field"><label for="sMethod">Medio</label><select id="sMethod"></select></div>
+    <div class="field"><label for="sPayDate">Fecha del pago</label><input id="sPayDate" type="date"></div></div></fieldset>
+  <div id="saleSummary" class="summarybox"></div>
+  <div id="saleError" class="error"></div>
+  <div class="modalactions"><button class="quiet" type="button" data-close="saleBg">Cancelar</button><button id="saleSave" class="primary" type="submit">Guardar venta</button></div>
+</form></section></div>
+
+<!-- Detalle -->
+<div id="detBg" class="modalbg hidden"><section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="detTitle">
+<div class="modalhead"><div><div class="eyebrow">Ventas · Detalle</div><h2 id="detTitle">Venta</h2><p id="detSub" class="hint" style="margin:0"></p></div><button class="close" type="button" data-close="detBg" aria-label="Cerrar">×</button></div>
+<div class="modalbody"><div id="detBody"></div>
+  <form id="payForm" class="subsection hidden" novalidate><strong>Registrar pago</strong><div class="grid3">
+    <div class="field"><label for="pAmount">Valor *</label><input id="pAmount" type="number" min="1" step="100"></div>
+    <div class="field"><label for="pMethod">Medio</label><select id="pMethod"></select></div>
+    <div class="field"><label for="pDate">Fecha</label><input id="pDate" type="date"></div></div>
+    <div id="payError" class="error"></div><div class="modalactions" style="margin-top:0"><button id="paySave" class="primary" type="submit">Registrar pago</button></div></form>
+  <div class="modalactions"><button id="voidBtn" class="danger-btn hidden" type="button">Anular venta</button><button id="delivBtn" class="quiet" type="button">Marcar entregada</button><a id="invoiceBtn" class="quiet" href="#" target="_blank" rel="noopener">Factura para imprimir</a></div>
+</div></section></div>
+
+<script src="/admin/app.js?v=1"></script>
+<script>
+const E=Endura,{$,esc,money,int}=E;let opts=null,sales=[],current=null,clientRef=null,lastEdited='pct';
+const PAY_LABEL={paid:['ok','Pagada'],partial:['warn','Abono'],due:['bad','Por cobrar']};
+
+E.start(async()=>{const m=new URLSearchParams(location.search);$('fMonth').value=m.has('todas')?'':E.thisMonth();if(m.get('pago')==='due'){$('fPay').value='due';$('fMonth').value=''}
+  await loadOptions();await load();if(m.get('venta'))openDetail(m.get('venta'))});
+
+async function loadOptions(){opts=await E.api('/sales/options');
+  $('dlCustomers').innerHTML=opts.customers.map(c=>`<option value="${esc(c.name)}">`).join('');$('dlReferrers').innerHTML=opts.referrers.map(r=>`<option value="${esc(r)}">`).join('');
+  $('sMethod').innerHTML=E.options(opts.payment_methods,'bancolombia');$('pMethod').innerHTML=E.options(opts.payment_methods,'bancolombia')}
+
+async function load(){const p=new URLSearchParams({kind:'sale',month:$('fMonth').value,status:$('fStatus').value,payment:$('fPay').value,search:$('fSearch').value.trim()});
+  try{const [d,rec]=await Promise.all([E.api('/sales?'+p),E.api('/receivables')]);sales=d.items;summary(d.summary,rec);render()}catch(e){$('rows').innerHTML=`<tr><td colspan="7" class="empty">${esc(e.message)}</td></tr>`}}
+function summary(s,rec){$('stCount').textContent=int(s.count);$('stUnits').textContent=`${int(s.units)} unidades · ${$('fMonth').value?E.fmtMonthLong($('fMonth').value):'todo el historial'}`;
+  $('stNet').textContent=money(s.net_revenue);$('stNetFoot').textContent=`Descuentos ${money(s.discounts)} · domicilios ${money(s.delivery_fees)} aparte`;
+  $('stMargin').textContent=money(s.margin);$('stMarginFoot').textContent=Number(s.net_revenue)?`${Math.round(s.margin/s.net_revenue*100)}% del ingreso neto`:'Ingreso neto menos costo';
+  $('stDue').textContent=money(rec.total);$('stDueFoot').innerHTML=`${rec.items.length} venta(s) con saldo · <button class="linkbtn" id="seeDue">ver</button>`}
+document.addEventListener('click',e=>{if(e.target.id==='seeDue'){$('fPay').value='due';$('fMonth').value='';load()}});
+
+function render(){if(!sales.length){$('rows').innerHTML='<tr><td colspan="7" class="empty"><strong>Sin ventas con estos filtros</strong><br>Registra una con «＋ Registrar venta».</td></tr>';$('count').textContent='0 ventas';return}
+  $('rows').innerHTML=sales.map(s=>{const v=s.status==='voided';const pay=PAY_LABEL[s.payment_status];return `<tr class="${v?'voided':''}">
+    <td class="nowrap"><strong>#${s.number}</strong><div class="muted">${E.fmtShort(s.sale_date)}${s.imported?' · Excel':''}</div></td>
+    <td>${s.customer_name?`<strong>${esc(s.customer_name)}</strong>`:'<span class="muted">Sin nombre</span>'}<div class="muted">${esc(s.referrer?('Vendió: '+s.referrer):s.customer_contact)}</div></td>
+    <td><ul class="items-mini">${s.items.slice(0,3).map(i=>`<li>${i.quantity} × ${esc(i.name)}</li>`).join('')}${s.items.length>3?`<li class="muted">+${s.items.length-3} más</li>`:''}</ul></td>
+    <td class="right nowrap"><strong>${money(s.total)}</strong>${Number(s.discount)||Number(s.delivery_fee)?`<div class="muted">${Number(s.discount)?'Desc. '+money(s.discount):''}${Number(s.discount)&&Number(s.delivery_fee)?' · ':''}${Number(s.delivery_fee)?'Dom. '+money(s.delivery_fee):''}</div>`:''}</td>
+    <td>${v?'<span class="pill bad">Anulada</span>':`<span class="pill ${pay[0]}">${pay[1]}</span>${s.payment_status!=='paid'?`<div class="muted">Saldo ${money(s.balance)}</div>`:''}`}${!v&&s.delivery_status==='pending'?'<div style="margin-top:4px"><span class="pill info">Por entregar</span></div>':''}</td>
+    <td class="right">${v?'—':`${money(s.margin)}<div class="muted">${Number(s.net_revenue)?Math.round(s.margin/s.net_revenue*100)+'%':''}</div>`}</td>
+    <td><button class="tiny" data-id="${s.id}">Ver</button></td></tr>`}).join('');$('count').textContent=`${sales.length} venta(s) en la lista`}
+
+// ---------- Registrar ----------
+function productOptions(){return '<option value="">Elige un producto…</option>'+opts.products.map(p=>`<option value="${p.id}" ${p.quantity<=0?'disabled':''}>${esc(p.name)} · ${esc(p.brand)} — ${p.quantity>0?`${p.quantity} und.${p.next_expiry?' · vence '+E.fmtMonth(p.next_expiry):''}`:'agotado'}</option>`).join('')}
+function addLine(){const n=$('lines').children.length;const div=document.createElement('div');div.className='line saleline';
+  div.innerHTML=`<div class="prodcell"><label for="lp${n}">Producto</label><select id="lp${n}" class="lp">${productOptions()}</select></div><div><label for="lq${n}">Cant.</label><input id="lq${n}" class="lq" type="number" min="1" step="1" value="1"></div><div><label for="lu${n}">Precio unit.</label><input id="lu${n}" class="lu" type="number" min="0" step="100"></div><div><label>Total</label><div class="val lt">—</div></div><button class="tiny lr" type="button" aria-label="Quitar">Quitar</button>`;
+  div.querySelector('.lp').addEventListener('change',()=>{const p=opts.products.find(x=>String(x.id)===div.querySelector('.lp').value);if(p)div.querySelector('.lu').value=p.sale_price??'';recalc(true)});
+  div.querySelector('.lr').addEventListener('click',()=>{if($('lines').children.length>1){div.remove();recalc(true)}else E.toast('La venta necesita al menos un producto')});$('lines').appendChild(div)}
+function readLines(){return [...$('lines').querySelectorAll('.saleline')].map(el=>({product_id:Number(el.querySelector('.lp').value),quantity:Number(el.querySelector('.lq').value),unit_price:el.querySelector('.lu').value===''?NaN:Number(el.querySelector('.lu').value),el}))}
+let paidTouched=false;
+function recalc(syncPaid){let sub=0,cost=0;const warn=[];readLines().forEach(l=>{const p=opts.products.find(x=>x.id===l.product_id);const t=l.quantity>0&&l.unit_price>=0?l.quantity*l.unit_price:0;l.el.querySelector('.lt').textContent=p&&t?money(t):'—';
+    if(p){sub+=t;cost+=l.quantity*Number(p.unit_cost||0);if(l.quantity>p.quantity)warn.push(`${p.name}: solo hay ${p.quantity}`)}});
+  if(lastEdited==='pct'){$('sDisc').value=Math.round(sub*Number($('sPct').value||0)/100)}else{$('sPct').value=sub?(Number($('sDisc').value||0)/sub*100).toFixed(1):0}
+  const disc=Number($('sDisc').value||0),deliv=Number($('sDelivery').value||0),net=sub-disc,total=net+deliv;if(disc>sub)warn.push('El descuento supera el valor de los productos');
+  if(syncPaid&&!paidTouched)$('sPaid').value=total;const paid=Number($('sPaid').value||0);if(paid>total)warn.push('El pago supera el total');
+  $('saleSummary').innerHTML=`<div class="totals"><span>Productos</span><span>${money(sub)}</span>${disc?`<span>Descuento</span><span>− ${money(disc)}</span>`:''}${deliv?`<span>Domicilio</span><span>+ ${money(deliv)}</span>`:''}
+    <span class="big">Total a cobrar</span><span class="big">${money(total)}</span><span class="sep"></span><span>Margen estimado (sin domicilio)</span><span>${money(net-cost)}${net?` · ${Math.round((net-cost)/net*100)}%`:''}</span>
+    ${total-paid>0&&sub?`<span>Queda por cobrar</span><span style="color:var(--danger);font-weight:600">${money(total-paid)}</span>`:''}</div>${warn.length?`<div class="error" style="margin:8px 0 0">${warn.map(esc).join('<br>')}</div>`:''}`}
+$('newSale').addEventListener('click',async()=>{await loadOptions();$('saleForm').reset();$('saleError').textContent='';$('lines').innerHTML='';addLine();paidTouched=false;lastEdited='pct';
+  $('sDate').value=E.today();$('sDate').max=E.today();$('sPayDate').value=E.today();$('sPayDate').max=E.today();clientRef=E.newRef();recalc(true);E.openModal('saleBg','sCustomer')});
+$('addLine').addEventListener('click',()=>{addLine();recalc(true)});
+$('saleForm').addEventListener('input',e=>{if(e.target.id==='sPct')lastEdited='pct';if(e.target.id==='sDisc')lastEdited='amount';if(e.target.id==='sPaid')paidTouched=true;recalc(e.target.id!=='sPaid')});
+$('sCustomer').addEventListener('change',()=>{const c=opts.customers.find(x=>x.name.toLowerCase()===$('sCustomer').value.trim().toLowerCase());if(c){if(!$('sContact').value)$('sContact').value=c.contact||'';if(!$('sDoc').value)$('sDoc').value=c.doc||'';if(!$('sAddress').value)$('sAddress').value=c.address||'';if(!$('sCity').value)$('sCity').value=c.city||''}});
+$('saleForm').addEventListener('submit',async e=>{e.preventDefault();$('saleError').textContent='';const lines=readLines();
+  if(lines.some(l=>!l.product_id)){$('saleError').textContent='Elige el producto en cada línea o quita las vacías.';return}
+  if(new Set(lines.map(l=>l.product_id)).size!==lines.length){$('saleError').textContent='Hay un producto repetido: súmalo en una sola línea.';return}
+  if(lines.some(l=>!Number.isInteger(l.quantity)||l.quantity<=0||!(l.unit_price>=0))){$('saleError').textContent='Revisa cantidades (enteras) y precios.';return}
+  const paid=Number($('sPaid').value||0);
+  const body={kind:'sale',sale_date:$('sDate').value,customer_name:$('sCustomer').value.trim(),customer_contact:$('sContact').value.trim(),customer_doc:$('sDoc').value.trim(),customer_address:$('sAddress').value.trim(),customer_city:$('sCity').value.trim(),
+    referrer:$('sReferrer').value.trim(),items:lines.map(({product_id,quantity,unit_price})=>({product_id,quantity,unit_price})),discount:Number($('sDisc').value||0),delivery_fee:Number($('sDelivery').value||0),
+    delivery_status:$('sDeliv').value,note:$('sNote').value.trim(),client_ref:clientRef,payment:paid>0?{amount:paid,method:$('sMethod').value,payment_date:$('sPayDate').value||null}:null};
+  $('saleSave').disabled=true;try{const s=await E.post('/sales',body);E.closeModal('saleBg');E.toast(`Venta #${s.number} registrada · ${money(s.total)}${Number(s.balance)>0?' · saldo '+money(s.balance):''}`);await Promise.all([load(),loadOptions()])}
+  catch(err){$('saleError').textContent=err.message}finally{$('saleSave').disabled=false}});
+
+// ---------- Detalle ----------
+$('rows').addEventListener('click',e=>{const b=e.target.closest('button[data-id]');if(b)openDetail(b.dataset.id)});
+async function openDetail(id){try{const s=await E.api('/sales/'+id);current=s;const v=s.status==='voided';
+  $('detTitle').textContent=`Venta #${s.number}`;$('detSub').textContent=`${E.fmtDate(s.sale_date)} · registró ${s.created_by_name||(s.imported?'importación del Excel':'—')}`;
+  $('detBody').innerHTML=`${v?`<div class="notice">Anulada por ${esc(s.voided_by_name||'—')} el ${E.fmtDate(s.voided_at)}: ${esc(s.void_reason)}</div>`:''}
+    <div class="detailgrid"><div><span>Cliente</span>${esc(s.customer_name||'Sin nombre')}</div><div><span>Contacto</span>${esc(s.customer_contact||'—')}</div><div><span>Vendió / recomendó</span>${esc(s.referrer||'—')}</div>
+    <div><span>Entrega</span>${s.delivery_status==='pending'?'<span class="pill info">Por entregar</span>':'Entregado'}</div>${s.customer_doc?`<div><span>CC / NIT</span>${esc(s.customer_doc)}</div>`:''}${s.customer_address||s.customer_city?`<div><span>Dirección</span>${esc([s.customer_address,s.customer_city].filter(Boolean).join(', '))}</div>`:''}${s.note?`<div><span>Nota</span>${esc(s.note)}</div>`:''}</div>
+    <div class="minitable tablewrap"><table><thead><tr><th>Producto</th><th class="right">Cant.</th><th class="right">Precio</th><th class="right">Total</th><th class="right">Costo</th></tr></thead><tbody>${s.items.map(i=>`<tr><td><strong>${esc(i.name)}</strong><div class="muted">${esc(i.sku)} · ${esc(i.brand)}</div></td><td class="right">${i.quantity}</td><td class="right">${money(i.unit_price)}</td><td class="right">${money(i.line_total)}</td><td class="right">${money(i.line_cost)}${i.cost_estimated?'<div class="muted">estimado</div>':''}</td></tr>`).join('')}</tbody></table></div>
+    <div class="summarybox" style="margin-top:14px"><div class="totals"><span>Productos</span><span>${money(s.subtotal)}</span>${Number(s.discount)?`<span>Descuento (${Number(s.discount_percent).toLocaleString('es-CO',{maximumFractionDigits:1})}%)</span><span>− ${money(s.discount)}</span>`:''}${Number(s.delivery_fee)?`<span>Domicilio</span><span>+ ${money(s.delivery_fee)}</span>`:''}
+      <span class="big">Total</span><span class="big">${money(s.total)}</span><span class="sep"></span><span>Costo de los productos</span><span>${money(s.cost_total)}</span><span><strong>Margen bruto</strong></span><span><strong>${money(s.margin)}</strong></span>
+      <span class="sep"></span><span>Pagado</span><span>${money(s.paid)}</span>${Number(s.balance)>0&&!v?`<span><strong>Saldo por cobrar</strong></span><span style="color:var(--danger);font-weight:700">${money(s.balance)}</span>`:''}</div></div>
+    <div class="subsection"><strong>Pagos</strong>${s.payments.length?`<div class="minitable tablewrap"><table><tbody>${s.payments.map(p=>`<tr><td>${E.fmtDate(p.payment_date)}</td><td>${esc(p.method_label)}${p.note?`<div class="muted">${esc(p.note)}</div>`:''}</td><td class="right"><strong>${money(p.amount)}</strong></td><td class="right">${E.me.role==='admin'&&!v?`<button class="tiny" data-delpay="${p.id}">Eliminar</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<p class="hint" style="margin:0">Sin pagos registrados.</p>'}</div>`;
+  const due=!v&&Number(s.balance)>0;$('payForm').classList.toggle('hidden',!due);$('payError').textContent='';if(due){$('pAmount').value=Number(s.balance);$('pDate').value=E.today();$('pDate').max=E.today()}
+  $('voidBtn').classList.toggle('hidden',v||E.me.role!=='admin');$('delivBtn').classList.toggle('hidden',v);$('delivBtn').textContent=s.delivery_status==='pending'?'Marcar entregada':'Marcar por entregar';
+  $('invoiceBtn').href='/admin/factura.html?id='+s.id;$('invoiceBtn').classList.toggle('hidden',v);E.openModal('detBg')}catch(err){E.toast(err.message)}}
+$('payForm').addEventListener('submit',async e=>{e.preventDefault();$('payError').textContent='';const a=Number($('pAmount').value);if(!(a>0)){$('payError').textContent='Indica el valor del pago.';return}
+  $('paySave').disabled=true;try{const s=await E.post(`/sales/${current.id}/payments`,{amount:a,method:$('pMethod').value,payment_date:$('pDate').value||null});E.toast(s.payment_status==='paid'?`Venta #${s.number} pagada por completo`:`Abono registrado · saldo ${money(s.balance)}`);await openDetail(current.id);load()}
+  catch(err){$('payError').textContent=err.message}finally{$('paySave').disabled=false}});
+$('detBody').addEventListener('click',async e=>{const b=e.target.closest('[data-delpay]');if(!b)return;if(!(await E.confirm({title:'Eliminar pago',text:'Úsalo solo para corregir un pago registrado por error. El saldo vuelve a la cartera.',ok:'Eliminar pago',danger:true})))return;
+  try{await E.del(`/sales/${current.id}/payments/${b.dataset.delpay}`);await openDetail(current.id);load()}catch(err){E.toast(err.message)}});
+$('delivBtn').addEventListener('click',async()=>{try{await E.patch(`/sales/${current.id}/delivery`,{delivery_status:current.delivery_status==='pending'?'delivered':'pending'});await openDetail(current.id);load()}catch(err){E.toast(err.message)}});
+$('voidBtn').addEventListener('click',async()=>{const reason=await E.confirm({title:`Anular venta #${current.number}`,text:'Las unidades vuelven al inventario y la venta queda marcada como anulada, con el motivo. No se borra nada.',ok:'Anular venta',danger:true,withReason:true,placeholder:'Ej. el cliente canceló, se registró dos veces…'});
+  if(!reason)return;try{const r=await E.post(`/sales/${current.id}/void`,{reason});E.closeModal('detBg');E.toast(r.message);await Promise.all([load(),loadOptions()])}catch(err){E.toast(err.message)}});
+
+['fMonth','fStatus','fPay'].forEach(id=>$(id).addEventListener('change',load));$('fSearch').addEventListener('input',E.debounce(load));
+</script>
+</body></html>

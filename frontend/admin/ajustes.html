@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b0b0f"><link rel="icon" href="/assets/endura-icon.png"><link rel="stylesheet" href="/admin/admin.css?v=1"><title>Endura · Ajustes</title></head>
+<body class="booting" data-page="settings">
+<div class="app"><main class="main">
+<div class="top"><div><div class="eyebrow">Administración</div><h1 class="title">Ajustes</h1>
+  <p class="desc">Cuentas del equipo y datos del negocio que aparecen en la factura. Solo los administradores entran aquí.</p></div>
+  <div class="topactions"><button id="newUser" class="primary" type="button">＋ Usuario</button></div></div>
+<div id="denied" class="notice hidden">Esta sección requiere permisos de administrador.</div>
+<div id="content" class="hidden">
+<section class="panel"><div class="panelhead"><div><h2>Equipo</h2><p>Un administrador gestiona usuarios, anula ventas y gastos, y maneja socios y marcas. Siempre debe quedar al menos uno activo.</p></div></div>
+  <div class="tablewrap"><table><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Creado</th><th></th></tr></thead><tbody id="uRows"></tbody></table></div></section>
+<section class="panel"><div class="panelhead"><div><h2>Datos del negocio</h2><p>Encabezado del documento equivalente a factura de venta.</p></div></div>
+  <form id="bForm" class="panelbody" novalidate><div class="grid2">
+    <div class="field"><label for="bName">Nombre comercial *</label><input id="bName" maxlength="160"></div>
+    <div class="field"><label for="bOwner">Titular</label><input id="bOwner" maxlength="160"></div>
+    <div class="field"><label for="bTax">NIT</label><input id="bTax" maxlength="60"></div>
+    <div class="field"><label for="bPrefix">Prefijo de factura</label><input id="bPrefix" maxlength="10"></div>
+    <div class="field"><label for="bAddress">Dirección</label><input id="bAddress" maxlength="200"></div>
+    <div class="field"><label for="bPhone">Celular</label><input id="bPhone" maxlength="60"></div>
+    <div class="field"><label for="bEmail">Correo</label><input id="bEmail" maxlength="160"></div>
+    <div class="field span2"><label for="bNote">Nota al pie de la factura</label><textarea id="bNote" maxlength="1000" placeholder="Ej. medios de pago, régimen, agradecimiento"></textarea></div></div>
+    <div id="bError" class="error"></div><div class="modalactions" style="justify-content:flex-start"><button id="bSave" class="primary" type="submit">Guardar datos</button></div></form></section>
+</div>
+</main></div>
+
+<div id="uBg" class="modalbg hidden"><section class="modal narrow" role="dialog" aria-modal="true" aria-labelledby="uTitle">
+<div class="modalhead"><div><div class="eyebrow">Equipo</div><h2 id="uTitle">Nuevo usuario</h2></div><button class="close" type="button" data-close="uBg" aria-label="Cerrar">×</button></div>
+<form id="uForm" class="modalbody" novalidate>
+  <div class="field" id="uNameWrap"><label for="uName">Usuario *</label><input id="uName" maxlength="80" autocomplete="off" placeholder="letras, números, punto o guion"></div>
+  <div class="field"><label for="uPass">Contraseña *</label><input id="uPass" type="password" minlength="10" autocomplete="new-password"><span class="hint">Mínimo 10 caracteres. Compártela por un canal privado.</span></div>
+  <div id="uError" class="error"></div><div class="modalactions"><button class="quiet" type="button" data-close="uBg">Cancelar</button><button id="uSave" class="primary" type="submit">Guardar</button></div>
+</form></section></div>
+
+<script src="/admin/app.js?v=1"></script>
+<script>
+const E=Endura,{$,esc}=E;let users=[],resetting=null;
+E.start(async me=>{if(me.role!=='admin'){$('denied').classList.remove('hidden');$('newUser').classList.add('hidden');return}$('content').classList.remove('hidden');await Promise.all([loadUsers(),loadBusiness()])});
+async function loadUsers(){users=(await E.api('/admin/users')).items;$('uRows').innerHTML=users.map(u=>{const self=u.id===E.me.id;return `<tr><td><strong>${esc(u.username)}</strong>${self?' <span class="muted">(tú)</span>':''}</td>
+  <td><span class="pill ${u.role==='admin'?'violet':'plain'}">${u.role==='admin'?'Administrador':'Equipo'}</span></td><td><span class="pill ${u.is_active?'ok':'bad'}">${u.is_active?'Activo':'Inactivo'}</span></td><td>${E.fmtDate(u.created_at)}</td>
+  <td><div class="actions" style="justify-content:flex-end"><button class="tiny" data-a="pass" data-id="${u.id}">Nueva contraseña</button><button class="tiny" data-a="role" data-id="${u.id}" ${self?'disabled':''}>${u.role==='admin'?'Quitar admin':'Hacer admin'}</button><button class="tiny" data-a="status" data-id="${u.id}" ${self?'disabled':''}>${u.is_active?'Desactivar':'Activar'}</button></div></td></tr>`}).join('')}
+async function loadBusiness(){const b=await E.api('/settings');$('bName').value=b.name;$('bOwner').value=b.owner;$('bTax').value=b.tax_id;$('bPrefix').value=b.invoice_prefix;$('bAddress').value=b.address;$('bPhone').value=b.phone;$('bEmail').value=b.email;$('bNote').value=b.invoice_note}
+$('newUser').addEventListener('click',()=>{resetting=null;$('uForm').reset();$('uError').textContent='';$('uTitle').textContent='Nuevo usuario';$('uNameWrap').classList.remove('hidden');E.openModal('uBg','uName')});
+$('uRows').addEventListener('click',async e=>{const b=e.target.closest('button[data-a]');if(!b)return;const u=users.find(x=>x.id==b.dataset.id);
+  if(b.dataset.a==='pass'){resetting=u;$('uForm').reset();$('uError').textContent='';$('uTitle').textContent=`Contraseña de ${u.username}`;$('uNameWrap').classList.add('hidden');E.openModal('uBg','uPass');return}
+  try{let r;if(b.dataset.a==='role'){if(!(await E.confirm({title:u.role==='admin'?'Quitar permisos de administrador':'Hacer administrador',text:u.username,ok:'Confirmar'})))return;r=await E.patch(`/admin/users/${u.id}/role`,{role:u.role==='admin'?'user':'admin'})}
+  else{if(!(await E.confirm({title:u.is_active?'Desactivar usuario':'Activar usuario',text:u.is_active?`${u.username} no podrá entrar y sus sesiones se cerrarán. Su historial se conserva.`:u.username,ok:'Confirmar',danger:u.is_active})))return;r=await E.patch(`/admin/users/${u.id}/status`,{is_active:!u.is_active})}
+  E.toast(r.message);loadUsers()}catch(err){E.toast(err.message)}});
+$('uForm').addEventListener('submit',async e=>{e.preventDefault();$('uError').textContent='';const pass=$('uPass').value;if(pass.length<10){$('uError').textContent='La contraseña debe tener al menos 10 caracteres.';return}
+  $('uSave').disabled=true;try{if(resetting){const r=await E.patch(`/admin/users/${resetting.id}/password`,{password:pass});E.toast(r.message)}else{const n=$('uName').value.trim();if(!/^[A-Za-z0-9_.-]{3,80}$/.test(n)){$('uError').textContent='Usuario de 3 a 80 caracteres: letras, números, punto, guion o guion bajo.';return}await E.post('/admin/users',{username:n,password:pass});E.toast(`Usuario ${n} creado`)}
+  E.closeModal('uBg');loadUsers()}catch(err){$('uError').textContent=err.message}finally{$('uSave').disabled=false}});
+$('bForm').addEventListener('submit',async e=>{e.preventDefault();$('bError').textContent='';if(!$('bName').value.trim()){$('bError').textContent='El nombre es obligatorio.';return}
+  $('bSave').disabled=true;try{await E.put('/settings',{name:$('bName').value.trim(),owner:$('bOwner').value.trim(),tax_id:$('bTax').value.trim(),invoice_prefix:$('bPrefix').value.trim(),address:$('bAddress').value.trim(),phone:$('bPhone').value.trim(),email:$('bEmail').value.trim(),invoice_note:$('bNote').value.trim()});E.toast('Datos del negocio guardados')}catch(err){$('bError').textContent=err.message}finally{$('bSave').disabled=false}});
+</script>
+</body></html>

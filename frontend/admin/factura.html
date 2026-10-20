@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b0b0f"><link rel="icon" href="/assets/endura-icon.png"><link rel="stylesheet" href="/admin/admin.css?v=1"><title>Endura · Factura</title>
+<style>body{background:var(--paper)}.invoice .biz{font-size:13px;line-height:1.6;color:var(--text)}.invoice .biz strong{color:var(--ink);font-size:15px}.invoice .client{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 24px;font-size:14px;margin-bottom:18px}.invoice .client span{color:var(--muted);display:inline-block;min-width:80px}.foot{margin-top:28px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}</style></head>
+<body class="booting">
+<div class="loginwrap" style="display:block;min-height:0">
+<div class="printbar"><button class="primary" type="button" onclick="print()">Imprimir o guardar PDF</button><a class="quiet" href="/admin/ventas.html">Volver a ventas</a></div>
+<article class="invoice" id="inv"><p class="empty">Cargando…</p></article>
+</div>
+<script src="/admin/app.js?v=1"></script>
+<script>
+const E=Endura,{$,esc,money}=E;
+(async()=>{try{const id=new URLSearchParams(location.search).get('id');const [s,b]=await Promise.all([E.api('/sales/'+id),E.api('/settings')]);document.body.classList.remove('booting');
+  if(s.kind!=='sale'){$('inv').innerHTML='<p class="empty">Solo las ventas tienen factura.</p>';return}
+  document.title=`${b.invoice_prefix} ${s.number} · ${s.customer_name||'Venta'}`;
+  $('inv').innerHTML=`<header><div class="biz"><img src="/assets/endura-logo-dark.png" alt="${esc(b.name)}" style="width:230px;display:block;margin-bottom:12px"><strong>${esc(b.name)}</strong><br>${esc(b.owner)}${b.tax_id?`<br>NIT ${esc(b.tax_id)}`:''}${b.address?`<br>${esc(b.address)}`:''}${b.phone?`<br>Celular: ${esc(b.phone)}`:''}${b.email?`<br>${esc(b.email)}`:''}</div>
+    <div class="doc"><h1>Documento equivalente<br>a factura de venta</h1><div class="docno">N.º ${esc(b.invoice_prefix)} ${s.number}</div><div class="hint">Fecha: ${E.fmtDate(s.sale_date)}</div>${s.status==='voided'?'<div class="pill bad" style="margin-top:8px">ANULADA</div>':''}</div></header>
+    <div class="client"><div><span>Señores:</span> <strong>${esc(s.customer_name||'Consumidor final')}</strong></div><div><span>CC / NIT:</span> ${esc(s.customer_doc||'—')}</div><div><span>Dirección:</span> ${esc(s.customer_address||'—')}</div><div><span>Ciudad:</span> ${esc(s.customer_city||'—')}</div><div><span>Teléfono:</span> ${esc(s.customer_contact||'—')}</div><div><span>Vence:</span> ${E.fmtDate(s.sale_date)}</div></div>
+    <table><thead><tr><th>Ítem</th><th>Descripción</th><th class="right">Cant.</th><th class="right">Valor unitario</th><th class="right">Valor total</th></tr></thead><tbody>${s.items.map((i,n)=>`<tr><td>${n+1}</td><td>${esc(i.name)}<div class="muted">${esc(i.brand)}</div></td><td class="right">${i.quantity}</td><td class="right">${money(i.unit_price)}</td><td class="right">${money(i.line_total)}</td></tr>`).join('')}</tbody></table>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px"><div class="totals" style="min-width:300px"><span>Subtotal</span><span class="right">${money(s.subtotal)}</span>${Number(s.discount)?`<span>Descuento</span><span class="right">− ${money(s.discount)}</span>`:''}${Number(s.delivery_fee)?`<span>Domicilio</span><span class="right">${money(s.delivery_fee)}</span>`:''}<span class="sep"></span><span class="big">Neto a pagar</span><span class="big right">${money(s.total)}</span>${Number(s.paid)?`<span>Pagado</span><span class="right">${money(s.paid)}</span>`:''}${Number(s.balance)>0?`<span><strong>Saldo</strong></span><span class="right"><strong>${money(s.balance)}</strong></span>`:''}</div></div>
+    <div class="foot">${esc(b.invoice_note||'Gracias por confiar en Endura Human.')}</div>`}catch(e){document.body.classList.remove('booting');$('inv').innerHTML=`<p class="error">${esc(e.message)}</p>`}})();
+</script>
+</body></html>

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b0b0f"><link rel="icon" href="/assets/endura-icon.png"><link rel="stylesheet" href="/admin/admin.css?v=1"><title>Endura · Patrocinios</title>
+<style>.gline{grid-template-columns:minmax(0,2.6fr) 90px 130px auto}@media(max-width:760px){.gline{grid-template-columns:1fr 1fr}.gline .prodcell{grid-column:1/-1}}</style></head>
+<body class="booting" data-page="giveaways">
+<div class="app"><main class="main">
+<div class="top">
+  <div><div class="eyebrow">Marca en movimiento</div><h1 class="title">Patrocinios</h1>
+  <p class="desc">Producto que sale sin venta: dotación de embajadores, activaciones y carreras, intercambios, uso interno y producto dañado o vencido. Descuenta inventario y su costo entra a los resultados como inversión de marca.</p></div>
+  <div class="topactions"><button id="newBtn" class="primary" type="button">＋ Registrar salida</button></div>
+</div>
+<div class="stats">
+  <div class="stat accent"><div class="statlabel">Entregas del periodo</div><div id="stCount" class="statvalue">—</div><div id="stUnits" class="statfoot">—</div></div>
+  <div class="stat"><div class="statlabel">Costo para Endura</div><div id="stCost" class="statvalue">—</div><div class="statfoot">Lo que realmente cuesta el producto entregado</div></div>
+  <div class="stat"><div class="statlabel">Valor comercial</div><div id="stValue" class="statvalue">—</div><div class="statfoot">A precio de venta al público</div></div>
+</div>
+<section class="panel">
+  <div class="panelhead"><div><h2>Entregas</h2><p id="byReason">—</p></div>
+    <div class="filters"><input id="fMonth" class="filter" type="month" aria-label="Mes">
+      <select id="fStatus" class="filter" aria-label="Estado"><option value="all">Vigentes y anuladas</option><option value="completed">Vigentes</option><option value="voided">Anuladas</option></select>
+      <input id="fSearch" class="search" type="search" placeholder="Destinatario o producto…" aria-label="Buscar"></div></div>
+  <div class="tablewrap"><table><thead><tr><th>Registro</th><th>Para</th><th>Motivo</th><th>Productos</th><th class="right">Costo</th><th class="right">Valor comercial</th><th></th></tr></thead>
+  <tbody id="rows"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody></table></div>
+</section>
+</main></div>
+<datalist id="dlRecipients"></datalist>
+
+<div id="gBg" class="modalbg hidden"><section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="gTitle">
+<div class="modalhead"><div><div class="eyebrow">Patrocinios · Registro</div><h2 id="gTitle">Registrar salida</h2></div><button class="close" type="button" data-close="gBg" aria-label="Cerrar">×</button></div>
+<form id="gForm" class="modalbody" novalidate>
+  <div class="grid3">
+    <div class="field"><label for="gDate">Fecha *</label><input id="gDate" type="date"></div>
+    <div class="field"><label for="gWho">Para *</label><input id="gWho" list="dlRecipients" maxlength="160" autocomplete="off" placeholder="Atleta, evento, aliado…"></div>
+    <div class="field"><label for="gReason">Motivo *</label><select id="gReason"></select></div>
+  </div>
+  <div class="linehead"><strong>Productos</strong><button id="addLine" class="quiet" type="button">＋ Añadir producto</button></div>
+  <div id="lines"></div>
+  <div class="field"><label for="gNote">Nota</label><input id="gNote" maxlength="1000" placeholder="Ej. dotación mensual, carrera Frontera 21K, intercambio por contenido…"></div>
+  <div id="gSummary" class="summarybox"></div>
+  <div id="gError" class="error"></div>
+  <div class="modalactions"><button class="quiet" type="button" data-close="gBg">Cancelar</button><button id="gSave" class="primary" type="submit">Guardar</button></div>
+</form></section></div>
+
+<div id="detBg" class="modalbg hidden"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="detTitle">
+<div class="modalhead"><div><div class="eyebrow">Patrocinios · Detalle</div><h2 id="detTitle">—</h2><p id="detSub" class="hint" style="margin:0"></p></div><button class="close" type="button" data-close="detBg" aria-label="Cerrar">×</button></div>
+<div class="modalbody"><div id="detBody"></div><div class="modalactions"><button id="voidBtn" class="danger-btn hidden" type="button">Anular registro</button></div></div></section></div>
+
+<script src="/admin/app.js?v=1"></script>
+<script>
+const E=Endura,{$,esc,money,int}=E;let opts=null,rows=[],current=null,clientRef=null;
+E.start(async()=>{$('fMonth').value=E.thisMonth();await loadOptions();await load()});
+async function loadOptions(){opts=await E.api('/sales/options');$('gReason').innerHTML=E.options(opts.giveaway_reasons,'ambassador');$('dlRecipients').innerHTML=opts.recipients.map(r=>`<option value="${esc(r)}">`).join('')}
+async function load(){const p=new URLSearchParams({kind:'giveaway',month:$('fMonth').value,status:$('fStatus').value,search:$('fSearch').value.trim()});
+  try{const d=await E.api('/sales?'+p);rows=d.items;const s=d.summary;$('stCount').textContent=int(s.count);$('stUnits').textContent=`${int(s.units)} unidades entregadas`;$('stCost').textContent=money(s.cost);$('stValue').textContent=money(s.subtotal);
+  const by={};rows.filter(r=>r.status==='completed').forEach(r=>{by[r.reason_label]=(by[r.reason_label]||0)+Number(r.cost_total)});
+  $('byReason').textContent=Object.keys(by).length?'Costo por motivo: '+Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k} ${money(v)}`).join(' · '):'Los registros anulados se conservan, pero no suman.';render()}
+  catch(e){$('rows').innerHTML=`<tr><td colspan="7" class="empty">${esc(e.message)}</td></tr>`}}
+function render(){if(!rows.length){$('rows').innerHTML='<tr><td colspan="7" class="empty"><strong>Sin entregas en este periodo</strong></td></tr>';return}
+  $('rows').innerHTML=rows.map(r=>{const v=r.status==='voided';return `<tr class="${v?'voided':''}"><td class="nowrap"><strong>#${r.number}</strong><div class="muted">${E.fmtShort(r.sale_date)}</div></td>
+  <td><strong>${esc(r.customer_name)}</strong>${r.note?`<div class="muted">${esc(r.note)}</div>`:''}</td><td>${v?'<span class="pill bad">Anulado</span>':`<span class="pill violet plain">${esc(r.reason_label)}</span>`}</td>
+  <td><ul class="items-mini">${r.items.slice(0,3).map(i=>`<li>${i.quantity} × ${esc(i.name)}</li>`).join('')}${r.items.length>3?`<li class="muted">+${r.items.length-3} más</li>`:''}</ul></td>
+  <td class="right">${money(r.cost_total)}</td><td class="right">${money(r.subtotal)}</td><td><button class="tiny" data-id="${r.id}">Ver</button></td></tr>`}).join('')}
+
+function productOptions(){return '<option value="">Elige un producto…</option>'+opts.products.map(p=>`<option value="${p.id}" ${p.quantity<=0?'disabled':''}>${esc(p.name)} · ${esc(p.brand)} — ${p.quantity>0?`${p.quantity} und.${p.next_expiry?' · vence '+E.fmtMonth(p.next_expiry):''}`:'agotado'}</option>`).join('')}
+function addLine(){const div=document.createElement('div');div.className='line gline';const n=$('lines').children.length;
+  div.innerHTML=`<div class="prodcell"><label for="gp${n}">Producto</label><select id="gp${n}" class="lp">${productOptions()}</select></div><div><label for="gq${n}">Cant.</label><input id="gq${n}" class="lq" type="number" min="1" step="1" value="1"></div><div><label>Costo</label><div class="val lc">—</div></div><button class="tiny lr" type="button">Quitar</button>`;
+  div.querySelector('.lr').addEventListener('click',()=>{if($('lines').children.length>1){div.remove();recalc()}});$('lines').appendChild(div)}
+function readLines(){return [...$('lines').querySelectorAll('.gline')].map(el=>{const p=opts.products.find(x=>String(x.id)===el.querySelector('.lp').value);return {p,quantity:Number(el.querySelector('.lq').value),el}})}
+function recalc(){let cost=0,val=0;const warn=[];readLines().forEach(l=>{if(!l.p){l.el.querySelector('.lc').textContent='—';return}const c=l.quantity*Number(l.p.unit_cost||0);cost+=c;val+=l.quantity*Number(l.p.sale_price||0);l.el.querySelector('.lc').textContent=money(c);if(l.quantity>l.p.quantity)warn.push(`${l.p.name}: solo hay ${l.p.quantity}`)});
+  $('gSummary').innerHTML=`<div class="totals"><span>Valor comercial</span><span>${money(val)}</span><span class="big">Costo para Endura</span><span class="big">${money(cost)}</span></div>${warn.length?`<div class="error" style="margin:8px 0 0">${warn.map(esc).join('<br>')}</div>`:''}`}
+$('newBtn').addEventListener('click',async()=>{await loadOptions();$('gForm').reset();$('gError').textContent='';$('lines').innerHTML='';addLine();$('gDate').value=E.today();$('gDate').max=E.today();clientRef=E.newRef();recalc();E.openModal('gBg','gWho')});
+$('addLine').addEventListener('click',()=>{addLine();recalc()});$('gForm').addEventListener('input',recalc);$('gForm').addEventListener('change',recalc);
+$('gForm').addEventListener('submit',async e=>{e.preventDefault();$('gError').textContent='';const lines=readLines();
+  if(!$('gWho').value.trim()){$('gError').textContent='Indica a quién se entrega.';return}if(lines.some(l=>!l.p)){$('gError').textContent='Elige el producto en cada línea o quita las vacías.';return}
+  if(new Set(lines.map(l=>l.p.id)).size!==lines.length){$('gError').textContent='Hay un producto repetido.';return}if(lines.some(l=>!Number.isInteger(l.quantity)||l.quantity<=0)){$('gError').textContent='Las cantidades deben ser enteras.';return}
+  $('gSave').disabled=true;try{const r=await E.post('/sales',{kind:'giveaway',sale_date:$('gDate').value,customer_name:$('gWho').value.trim(),reason:$('gReason').value,note:$('gNote').value.trim(),client_ref:clientRef,
+    items:lines.map(l=>({product_id:l.p.id,quantity:l.quantity,unit_price:Number(l.p.sale_price||0)}))});E.closeModal('gBg');E.toast(`Registro #${r.number} guardado · costo ${money(r.cost_total)}`);await Promise.all([load(),loadOptions()])}
+  catch(err){$('gError').textContent=err.message}finally{$('gSave').disabled=false}});
+
+$('rows').addEventListener('click',e=>{const b=e.target.closest('button[data-id]');if(b)openDetail(b.dataset.id)});
+async function openDetail(id){try{const r=await E.api('/sales/'+id);current=r;const v=r.status==='voided';$('detTitle').textContent=`#${r.number} · ${r.customer_name}`;$('detSub').textContent=`${E.fmtDate(r.sale_date)} · ${r.reason_label} · registró ${r.created_by_name||(r.imported?'importación del Excel':'—')}`;
+  $('detBody').innerHTML=`${v?`<div class="notice">Anulado: ${esc(r.void_reason)}</div>`:''}${r.note?`<p class="desc" style="margin:0 0 12px">${esc(r.note)}</p>`:''}<div class="minitable tablewrap"><table><thead><tr><th>Producto</th><th class="right">Cant.</th><th class="right">Costo</th><th class="right">Valor comercial</th></tr></thead><tbody>${r.items.map(i=>`<tr><td><strong>${esc(i.name)}</strong><div class="muted">${esc(i.brand)}</div></td><td class="right">${i.quantity}</td><td class="right">${money(i.line_cost)}</td><td class="right">${money(i.line_total)}</td></tr>`).join('')}</tbody></table></div>
+  <div class="summarybox" style="margin-top:12px"><div class="totals"><span>Valor comercial</span><span>${money(r.subtotal)}</span><span class="big">Costo</span><span class="big">${money(r.cost_total)}</span></div></div>`;
+  $('voidBtn').classList.toggle('hidden',v||E.me.role!=='admin');E.openModal('detBg')}catch(err){E.toast(err.message)}}
+$('voidBtn').addEventListener('click',async()=>{const reason=await E.confirm({title:`Anular registro #${current.number}`,text:'Las unidades vuelven al inventario. El registro se conserva como anulado.',ok:'Anular',danger:true,withReason:true});
+  if(!reason)return;try{const r=await E.post(`/sales/${current.id}/void`,{reason});E.closeModal('detBg');E.toast(r.message);load()}catch(err){E.toast(err.message)}});
+['fMonth','fStatus'].forEach(id=>$(id).addEventListener('change',load));$('fSearch').addEventListener('input',E.debounce(load));
+</script>
+</body></html>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b0b0f"><link rel="icon" href="/assets/endura-icon.png"><link rel="stylesheet" href="/admin/admin.css?v=1"><title>Endura · Resultados</title>
+<style>.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--surface-2)}.seg button{border:0;background:transparent;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--text)}.seg button[aria-pressed=true]{background:var(--white);color:var(--violet-ink);box-shadow:0 1px 3px #0002}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:14px}.kv:last-child{border-bottom:0}.kv strong{font-variant-numeric:tabular-nums}</style></head>
+<body class="booting" data-page="results">
+<div class="app"><main class="main">
+<div class="top">
+  <div><div class="eyebrow">Números del mes</div><h1 class="title">Resultados</h1>
+  <p class="desc">Estado de resultados con lo registrado en la plataforma: ventas, costo de lo vendido, domicilios, patrocinios, gastos y ajustes de inventario. Las compras no son gasto: se vuelven costo cuando el producto se vende.</p></div>
+  <div class="topactions"><input id="fMonth" class="filter" type="month" aria-label="Mes"></div>
+</div>
+<div id="estNotice" class="notice hidden"></div>
+<div class="stats">
+  <div class="stat accent"><div class="statlabel">Resultado del mes</div><div id="stResult" class="statvalue">—</div><div id="stResultFoot" class="statfoot">—</div></div>
+  <div class="stat"><div class="statlabel">Ingreso neto</div><div id="stNet" class="statvalue">—</div><div id="stNetFoot" class="statfoot">—</div></div>
+  <div class="stat"><div class="statlabel">Cobrado en el mes</div><div id="stCollected" class="statvalue">—</div><div id="stCollectedFoot" class="statfoot">—</div></div>
+  <div class="stat alert"><div class="statlabel">Cartera por cobrar</div><div id="stRec" class="statvalue">—</div><div id="stRecFoot" class="statfoot">—</div></div>
+</div>
+<div class="cols2">
+  <section class="panel"><div class="panelhead"><div><h2>Estado de resultados</h2><p id="plMonth">—</p></div></div><div class="panelbody"><div id="pl" class="pl"></div></div></section>
+  <section class="panel"><div class="panelhead"><div><h2>Últimos seis meses</h2><p id="trendHint">Pasa el cursor por una barra para ver la cifra.</p></div>
+    <div class="seg" role="group" aria-label="Medida"><button type="button" data-m="result" aria-pressed="true">Resultado</button><button type="button" data-m="net_revenue" aria-pressed="false">Ingreso neto</button><button type="button" data-m="gross_margin" aria-pressed="false">Margen bruto</button></div></div>
+    <div class="panelbody"><div id="chart" class="chart"></div>
+    <details class="more" style="margin:12px 0 0"><summary>Ver como tabla</summary><div id="trendTable"></div></details></div></section>
+</div>
+<div class="cols2">
+  <section class="panel"><div class="panelhead"><div><h2>Ventas por marca</h2><p>Ingreso neto con el descuento repartido entre productos.</p></div></div><div class="tablewrap"><table><thead><tr><th>Marca</th><th class="right">Und.</th><th class="right">Ingreso neto</th><th class="right">Margen</th><th>Participación</th></tr></thead><tbody id="brandRows"></tbody></table></div></section>
+  <section class="panel"><div class="panelhead"><div><h2>Inventario hoy</h2><p>Fotografía al día de hoy, no del mes elegido.</p></div></div><div class="panelbody" id="invBox"></div></section>
+</div>
+<section class="panel"><div class="panelhead"><div><h2>Productos más vendidos</h2><p>Top 20 del mes por ingreso neto.</p></div></div><div class="tablewrap"><table><thead><tr><th>Producto</th><th class="right">Und.</th><th class="right">Ingreso neto</th><th class="right">Costo</th><th class="right">Margen</th></tr></thead><tbody id="prodRows"></tbody></table></div></section>
+<div class="cols2">
+  <section class="panel"><div class="panelhead"><div><h2>Gastos y patrocinios</h2></div></div><div class="panelbody" id="spendBox"></div></section>
+  <section class="panel"><div class="panelhead"><div><h2>Ventas por vendedor</h2><p>Según «Vendió / recomendó».</p></div></div><div class="panelbody" id="refBox"></div></section>
+</div>
+</main></div>
+<script src="/admin/app.js?v=1"></script>
+<script>
+const E=Endura,{$,esc,money,int,pct}=E;let data=null,measure='result';
+const MLABEL={result:'Resultado',net_revenue:'Ingreso neto',gross_margin:'Margen bruto'};
+E.start(async()=>{$('fMonth').value=E.thisMonth();$('fMonth').max=E.thisMonth();await load()});
+$('fMonth').addEventListener('change',load);
+document.querySelector('.seg').addEventListener('click',e=>{const b=e.target.closest('button[data-m]');if(!b)return;measure=b.dataset.m;document.querySelectorAll('.seg button').forEach(x=>x.setAttribute('aria-pressed',x===b));chart()});
+async function load(){try{data=await E.api('/reports/summary?month='+$('fMonth').value);render()}catch(e){E.toast(e.message)}}
+const signed=v=>(Number(v)<0?'− ':'')+money(Math.abs(Number(v)));
+function render(){const f=data.figures,m=E.fmtMonthLong(data.month);
+  $('estNotice').classList.toggle('hidden',!data.estimated_cost_lines);$('estNotice').textContent=`${data.estimated_cost_lines} línea(s) de venta de este mes vienen del Excel y su costo es estimado con el costo actual del producto.`;
+  $('stResult').textContent=signed(f.result);$('stResult').style.color=Number(f.result)<0?'var(--danger)':'';$('stResultFoot').textContent=m;
+  $('stNet').textContent=money(f.net_revenue);$('stNetFoot').textContent=`${f.sales} venta(s) · ${int(f.units)} unidades`;
+  $('stCollected').textContent=money(data.collected_total);$('stCollectedFoot').textContent=data.collected.map(c=>`${c.label} ${money(c.total)}`).join(' · ')||'Sin pagos en el mes';
+  $('stRec').textContent=money(data.receivables.total);$('stRecFoot').innerHTML=`${data.receivables.n} venta(s) · <a href="/admin/ventas.html?pago=due">ver cartera</a>`;
+  $('plMonth').textContent=m;
+  const row=(label,v,cls='',neg=false)=>`<div class="${cls}">${label}</div><div class="${cls} right${neg&&Number(v)?' neg':''}">${neg&&Number(v)?'− '+money(v):(cls.includes('grand')||cls.includes('tot')?signed(v):money(v))}</div>`;
+  $('pl').innerHTML=row('Ventas brutas',f.gross)+row('Descuentos',f.discounts,'sub',true)+row('Ingreso neto',f.net_revenue,'tot')+row('Costo de lo vendido',f.cost,'sub',true)
+    +row(`Margen bruto${f.gross_margin_pct!=null?' · '+pct(f.gross_margin_pct):''}`,f.gross_margin,'tot')+row('Domicilios cobrados',f.delivery_fees,'sub')+row(`Patrocinios y salidas (${f.giveaways}) a costo`,f.giveaway_cost,'sub',true)
+    +row('Gastos operativos',f.expenses,'sub',true)+row('Ajustes de inventario a costo',f.adjustments,'sub',true)+row('Resultado del mes',f.result,'grand');
+  chart();
+  const totalNet=data.by_brand.reduce((a,b)=>a+Number(b.net),0)||1;
+  $('brandRows').innerHTML=data.by_brand.length?data.by_brand.map(b=>`<tr><td><strong>${esc(b.brand)}</strong></td><td class="right">${int(b.units)}</td><td class="right">${money(b.net)}</td><td class="right">${money(b.margin)}<div class="muted">${Number(b.net)?Math.round(b.margin/b.net*100)+'%':''}</div></td><td><div class="meter" title="${Math.round(b.net/totalNet*100)}%"><span style="width:${b.net/totalNet*100}%"></span></div><div class="muted">${Math.round(b.net/totalNet*100)}%</div></td></tr>`).join(''):'<tr><td colspan="5" class="empty">Sin ventas en el mes.</td></tr>';
+  $('prodRows').innerHTML=data.by_product.length?data.by_product.map(p=>`<tr><td><strong>${esc(p.name)}</strong><div class="muted">${esc(p.sku)} · ${esc(p.brand)}</div></td><td class="right">${int(p.units)}</td><td class="right">${money(p.net)}</td><td class="right">${money(p.cost)}${p.estimated?'<div class="muted">estimado</div>':''}</td><td class="right">${money(p.margin)}<div class="muted">${Number(p.net)?Math.round(p.margin/p.net*100)+'%':''}</div></td></tr>`).join(''):'<tr><td colspan="5" class="empty">Sin ventas en el mes.</td></tr>';
+  const inv=data.inventory;
+  $('invBox').innerHTML=`<div class="kv"><span>Unidades en bodega</span><strong>${int(inv.units)}</strong></div><div class="kv"><span>Valor a costo</span><strong>${money(inv.value_cost)}</strong></div><div class="kv"><span>Valor a precio de venta</span><strong>${money(inv.value_price)}</strong></div>
+    <div class="kv"><span>Vencen en ${data.expiry_warning_days} días</span><strong>${int(inv.expiring_units)} und. · ${money(inv.expiring_value)}</strong></div><div class="kv"><span>Ya vencidas</span><strong style="${Number(inv.expired_units)?'color:var(--danger)':''}">${int(inv.expired_units)} und. · ${money(inv.expired_value)}</strong></div>
+    <div class="kv"><span>Compras del mes</span><strong>${money(data.purchases.total)} <span class="muted">(${data.purchases.n})</span></strong></div><p class="hint" style="margin:10px 0 0"><a href="/admin/">Ir a inventario</a> para ver los lotes por vencer.</p>`;
+  const list=(rows,lab,val)=>rows.length?rows.map(r=>`<div class="kv"><span>${esc(r[lab])}</span><strong>${money(r[val])}</strong></div>`).join(''):'<p class="hint" style="margin:0">Nada registrado.</p>';
+  $('spendBox').innerHTML=`<strong style="font:700 italic 15px var(--display);text-transform:uppercase">Gastos · ${money(f.expenses)}</strong>${list(data.expenses,'label','total')}<div class="subsection"><strong>Patrocinios a costo · ${money(f.giveaway_cost)}</strong>${list(data.giveaways,'label','cost')}</div>`;
+  $('refBox').innerHTML=data.by_referrer.length?data.by_referrer.map(r=>`<div class="kv"><span>${esc(r.referrer)} <span class="muted">· ${r.sales} venta(s)</span></span><strong>${money(r.net)}</strong></div>`).join(''):'<p class="hint" style="margin:0">Sin ventas en el mes.</p>';}
+
+function chart(){const t=data.trend,vals=t.map(x=>Number(x[measure]));const max=Math.max(0,...vals),min=Math.min(0,...vals);const W=560,H=250,L=8,R=8,T=28,B=min<0?50:30,span=(max-min)||1;
+  const y=v=>T+(max-v)/span*(H-T-B),bw=(W-L-R)/t.length,barW=Math.min(46,bw*.55),zero=y(0);
+  const bars=t.map((x,i)=>{const v=vals[i],cx=L+bw*i+bw/2,top=Math.min(y(v),zero),h=Math.max(Math.abs(y(v)-zero),v?2:0),neg=v<0,r=Math.min(4,h/2);
+    const path=neg?`M${cx-barW/2},${top} h${barW} v${h-r} q0,${r} -${r},${r} h-${barW-2*r} q-${r},0 -${r},-${r} z`:`M${cx-barW/2},${top+h} v-${h-r} q0,-${r} ${r},-${r} h${barW-2*r} q${r},0 ${r},${r} v${h-r} z`;
+    const last=i===t.length-1;return `<g class="hit" data-i="${i}"><rect x="${L+bw*i}" y="${T-20}" width="${bw}" height="${H-T+20-B+4}" fill="transparent"/>${h?`<path class="bar${neg?' neg':''}${x.month===data.month?'':' dim'}" d="${path}"/>`:''}
+      ${x.month===data.month||last?`<text class="vlabel" x="${cx}" y="${neg?top+h+15:top-7}" text-anchor="middle">${signed(v)}</text>`:''}<text class="axislabel" x="${cx}" y="${H-6}" text-anchor="middle">${E.fmtMonth(x.month+'-01')}</text></g>`}).join('');
+  $('chart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${MLABEL[measure]} de los últimos seis meses"><line class="axis" x1="${L}" x2="${W-R}" y1="${zero}" y2="${zero}"/>${bars}</svg><div class="tip" id="tip"></div>`;
+  const svg=$('chart').querySelector('svg'),tip=$('tip');
+  svg.querySelectorAll('.hit').forEach(g=>{g.addEventListener('mousemove',ev=>{const i=+g.dataset.i,r=$('chart').getBoundingClientRect();tip.innerHTML=`<strong>${E.fmtMonthLong(t[i].month)}</strong><br>${MLABEL[measure]}: ${signed(vals[i])}`;tip.style.left=(ev.clientX-r.left)+'px';tip.style.top=(ev.clientY-r.top)+'px';tip.style.opacity=1});g.addEventListener('mouseleave',()=>tip.style.opacity=0)});
+  $('trendTable').innerHTML=`<div class="minitable tablewrap"><table><thead><tr><th>Mes</th><th class="right">Ingreso neto</th><th class="right">Margen bruto</th><th class="right">Patrocinios</th><th class="right">Gastos</th><th class="right">Resultado</th></tr></thead><tbody>${t.map(x=>`<tr><td>${E.fmtMonthLong(x.month)}</td><td class="right">${money(x.net_revenue)}</td><td class="right">${money(x.gross_margin)}</td><td class="right">${money(x.giveaway_cost)}</td><td class="right">${money(x.expenses)}</td><td class="right"><strong>${signed(x.result)}</strong></td></tr>`).join('')}</tbody></table></div>`}
+</script>
+</body></html>

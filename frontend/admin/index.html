@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b0b0f"><link rel="icon" href="/assets/endura-icon.png"><link rel="stylesheet" href="/admin/admin.css?v=1"><title>Endura · Inventario</title></head>
+<body class="booting" data-page="inventory">
+<div class="app"><main class="main">
+<div class="top">
+  <div><div class="eyebrow">Bodega</div><h1 class="title">Inventario</h1>
+  <p class="desc">Existencias por lote y fecha de vencimiento. Las ventas y patrocinios descuentan primero lo que vence antes.</p></div>
+  <div class="topactions"><button id="expBtn" class="quiet" type="button">Vencimientos</button><button id="brandsBtn" class="quiet hidden" type="button">Marcas</button><button id="newBtn" class="primary" type="button">＋ Producto</button></div>
+</div>
+<div class="stats">
+  <div class="stat accent"><div class="statlabel">Unidades en bodega</div><div id="stUnits" class="statvalue">—</div><div id="stRefs" class="statfoot">—</div></div>
+  <div class="stat"><div class="statlabel">Valor a costo</div><div id="stCost" class="statvalue">—</div><div id="stPrice" class="statfoot">—</div></div>
+  <div class="stat alert"><div class="statlabel">Por vencer</div><div id="stExp" class="statvalue">—</div><div id="stExpFoot" class="statfoot">—</div></div>
+  <div class="stat"><div class="statlabel">Agotados · bajo mínimo</div><div id="stOut" class="statvalue">—</div><div class="statfoot">Referencias sin stock o en su mínimo</div></div>
+</div>
+<section class="panel">
+  <div class="panelhead"><div><h2>Productos</h2><p id="countLine">—</p></div>
+    <div class="filters">
+      <input id="fSearch" class="search" type="search" placeholder="Producto, referencia o marca…" aria-label="Buscar">
+      <select id="fBrand" class="filter" aria-label="Marca"><option value="">Todas las marcas</option></select>
+      <select id="fCat" class="filter" aria-label="Categoría"><option value="all">Todas las categorías</option></select>
+      <select id="fStatus" class="filter" aria-label="Estado"><option value="all">Todos</option><option value="ok">Con stock</option><option value="low">Bajo mínimo</option><option value="out">Agotados</option><option value="expiring">Por vencer</option><option value="expired">Vencidos</option></select>
+    </div></div>
+  <div class="tablewrap"><table><thead><tr><th>Producto</th><th>Categoría</th><th class="right">Stock</th><th>Próximo vencimiento</th><th class="right">Costo</th><th class="right">Precio</th><th class="right">Margen</th><th></th></tr></thead>
+  <tbody id="rows"><tr><td colspan="8" class="empty">Cargando…</td></tr></tbody></table></div>
+</section>
+</main></div>
+
+<!-- Producto -->
+<div id="prodBg" class="modalbg hidden"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="prodTitle">
+<div class="modalhead"><div><div class="eyebrow">Inventario · Ficha</div><h2 id="prodTitle">Nuevo producto</h2></div><button class="close" type="button" data-close="prodBg" aria-label="Cerrar">×</button></div>
+<form id="prodForm" class="modalbody" novalidate>
+  <div class="grid2">
+    <div class="field"><label for="pSku">Referencia *</label><input id="pSku" maxlength="40" placeholder="Ej. MAU-01" required></div>
+    <div class="field"><label for="pBrand">Marca *</label><select id="pBrand" required></select></div>
+    <div class="field span2"><label for="pName">Nombre *</label><input id="pName" maxlength="200" placeholder="Ej. GEL 100 CAF 100" required></div>
+    <div class="field"><label for="pCat">Categoría</label><select id="pCat"></select></div>
+    <div class="field"><label for="pBox">Unidades por caja</label><input id="pBox" type="number" min="1" step="1" value="1"></div>
+    <div class="field"><label for="pCost">Costo unitario (COP)</label><input id="pCost" type="number" min="0" step="100" value="0"><span id="pCostHint" class="hint">Con existencias, el costo lo fijan los lotes (promedio ponderado).</span></div>
+    <div class="field"><label for="pPrice">Precio de venta (COP)</label><input id="pPrice" type="number" min="0" step="100"></div>
+    <div class="field"><label for="pMin">Stock mínimo</label><input id="pMin" type="number" min="0" step="1" value="0"><span class="hint">Avisa cuando queden estas unidades o menos.</span></div>
+    <div class="field"><label>Margen sobre precio</label><div id="pMargin" class="summarybox" style="padding:9px 12px">—</div></div>
+  </div>
+  <fieldset id="pInitial" class="fieldset"><legend>Existencia inicial (opcional)</legend><div class="grid2">
+    <div class="field"><label for="pQty">Unidades</label><input id="pQty" type="number" min="0" step="1" value="0"></div>
+    <div class="field"><label for="pExp">Vence</label><input id="pExp" type="month"></div></div></fieldset>
+  <div class="field"><label for="pNotes">Notas</label><textarea id="pNotes" maxlength="2000" placeholder="Sabor, presentación, porciones, proveedor…"></textarea></div>
+  <div id="prodError" class="error"></div>
+  <div class="modalactions"><button id="prodRetire" class="danger-btn hidden" type="button">Retirar del catálogo</button><button class="quiet" type="button" data-close="prodBg">Cancelar</button><button id="prodSave" class="primary" type="submit">Guardar</button></div>
+</form></section></div>
+
+<!-- Detalle y lotes -->
+<div id="detBg" class="modalbg hidden"><section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="detTitle">
+<div class="modalhead"><div><div class="eyebrow" id="detEyebrow">Producto</div><h2 id="detTitle">—</h2><p id="detSub" class="hint" style="margin:0"></p></div><button class="close" type="button" data-close="detBg" aria-label="Cerrar">×</button></div>
+<div class="modalbody"><div id="detBody"></div>
+  <div class="modalactions"><a id="detMov" class="quiet" href="#">Ver movimientos</a><button id="detEdit" class="quiet" type="button">Editar ficha</button><button id="detExit" class="quiet" type="button">Registrar salida</button><button id="detEntry" class="primary" type="button">＋ Entrada</button></div>
+</div></section></div>
+
+<!-- Entrada -->
+<div id="entBg" class="modalbg hidden"><section class="modal narrow" role="dialog" aria-modal="true" aria-labelledby="entTitle">
+<div class="modalhead"><div><div class="eyebrow">Entrada manual</div><h2 id="entTitle">Entrada</h2></div><button class="close" type="button" data-close="entBg" aria-label="Cerrar">×</button></div>
+<form id="entForm" class="modalbody" novalidate>
+  <p class="hint" style="margin-top:0">Para mercancía de un proveedor usa <a href="/admin/compras.html">Compras</a>: así queda el costo aterrizado y quién la financió.</p>
+  <div class="grid2"><div class="field"><label for="eQty">Unidades *</label><input id="eQty" type="number" min="1" step="1" required></div>
+  <div class="field"><label for="eCost">Costo unitario *</label><input id="eCost" type="number" min="0" step="100" required></div>
+  <div class="field span2"><label for="eExp">Vence</label><input id="eExp" type="month"><span class="hint">Mes de vencimiento impreso en el empaque.</span></div></div>
+  <div class="field"><label for="eNote">Motivo</label><input id="eNote" maxlength="500" placeholder="Ej. conteo físico, devolución de cliente…"></div>
+  <div id="entError" class="error"></div>
+  <div class="modalactions"><button class="quiet" type="button" data-close="entBg">Cancelar</button><button id="entSave" class="primary" type="submit">Registrar entrada</button></div>
+</form></section></div>
+
+<!-- Salida -->
+<div id="exBg" class="modalbg hidden"><section class="modal narrow" role="dialog" aria-modal="true" aria-labelledby="exTitle">
+<div class="modalhead"><div><div class="eyebrow">Salida manual</div><h2 id="exTitle">Salida</h2></div><button class="close" type="button" data-close="exBg" aria-label="Cerrar">×</button></div>
+<form id="exForm" class="modalbody" novalidate>
+  <p class="hint" style="margin-top:0">Para entregas a embajadores, eventos o producto dañado usa <a href="/admin/patrocinios.html">Patrocinios</a>. Esta salida es para ajustes de conteo.</p>
+  <div class="grid2"><div class="field"><label for="xQty">Unidades *</label><input id="xQty" type="number" min="1" step="1" required></div>
+  <div class="field"><label for="xLot">Lote</label><select id="xLot"></select></div></div>
+  <div class="field"><label for="xNote">Motivo *</label><input id="xNote" maxlength="500" placeholder="Ej. diferencia en conteo físico"></div>
+  <div id="exError" class="error"></div>
+  <div class="modalactions"><button class="quiet" type="button" data-close="exBg">Cancelar</button><button id="exSave" class="primary" type="submit">Registrar salida</button></div>
+</form></section></div>
+
+<!-- Marcas -->
+<div id="brBg" class="modalbg hidden"><section class="modal narrow" role="dialog" aria-modal="true" aria-labelledby="brTitle">
+<div class="modalhead"><div><div class="eyebrow">Catálogo</div><h2 id="brTitle">Marcas</h2></div><button class="close" type="button" data-close="brBg" aria-label="Cerrar">×</button></div>
+<div class="modalbody">
+  <form id="brForm" class="filters" style="margin-bottom:12px" novalidate><input id="brName" class="search" style="flex:1" maxlength="100" placeholder="Nueva marca" aria-label="Nueva marca"><button class="primary" type="submit">Añadir</button></form>
+  <div id="brError" class="error"></div><div id="brList"></div>
+</div></section></div>
+
+<!-- Vencimientos -->
+<div id="vxBg" class="modalbg hidden"><section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="vxTitle">
+<div class="modalhead"><div><div class="eyebrow">Rotación</div><h2 id="vxTitle">Vencimientos</h2><p class="hint" style="margin:0">Lotes vencidos o que vencen en los próximos meses. Prioriza su venta o úsalos en activaciones.</p></div><button class="close" type="button" data-close="vxBg" aria-label="Cerrar">×</button></div>
+<div class="modalbody"><div class="filters" style="margin-bottom:12px"><label for="vxDays" class="hint">Mostrar hasta</label><select id="vxDays" class="filter"><option value="60">60 días</option><option value="90" selected>90 días</option><option value="180">6 meses</option><option value="365">1 año</option></select></div><div id="vxBody"></div></div></section></div>
+
+<script src="/admin/app.js?v=1"></script>
+<script>
+const E=Endura,{$,esc,money,int,pct}=E;let cat=null,brands=[],items=[],current=null,warnDays=90;
+const monthToDate=E.monthEnd, dateToMonth=v=>v?String(v).slice(0,7):'';
+
+E.start(async me=>{
+  cat=await E.catalogs();warnDays=cat.expiry_warning_days;
+  $('fCat').innerHTML='<option value="all">Todas las categorías</option>'+E.options(cat.product_categories);
+  $('pCat').innerHTML=E.options(cat.product_categories,'gel');
+  $('brandsBtn').classList.toggle('hidden',me.role!=='admin');
+  await loadBrands();await load();
+  const open=new URLSearchParams(location.search).get('producto');if(open)openDetail(open);
+});
+
+async function loadBrands(){brands=(await E.api('/brands')).items;const sel=$('fBrand').value;
+  $('fBrand').innerHTML='<option value="">Todas las marcas</option>'+brands.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');$('fBrand').value=sel;
+  $('pBrand').innerHTML='<option value="">Elige una marca…</option>'+brands.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('')}
+
+async function load(){const p=new URLSearchParams({search:$('fSearch').value.trim(),category:$('fCat').value,status:$('fStatus').value});if($('fBrand').value)p.set('brand_id',$('fBrand').value);
+  try{const d=await E.api('/inventory?'+p);items=d.items;summary(d.summary);render()}catch(e){$('rows').innerHTML=`<tr><td colspan="8" class="empty">${esc(e.message)}</td></tr>`}}
+
+function summary(s){$('stUnits').textContent=int(s.units);$('stRefs').textContent=`${int(s.refs)} referencias activas`;$('stCost').textContent=money(s.value_cost);$('stPrice').textContent=`A precio de venta: ${money(s.value_price)}`;
+  $('stExp').textContent=int(s.expiring_units);$('stExpFoot').textContent=`${money(s.expiring_value)} a costo en ${warnDays} días`+(Number(s.expired_units)?` · ${int(s.expired_units)} vencidas`:'');$('stOut').textContent=`${int(s.out_of_stock)} · ${int(s.low)}`}
+
+function stockCell(i){let pill='';if(i.quantity===0)pill='<span class="pill bad">Agotado</span>';else if(i.quantity<=i.min_stock)pill='<span class="pill warn">Bajo mínimo</span>';
+  const boxes=i.units_per_box>1&&i.quantity>=i.units_per_box?`<div class="muted">${(i.quantity/i.units_per_box).toLocaleString('es-CO',{maximumFractionDigits:1})} cajas × ${i.units_per_box}</div>`:'';
+  return `<strong>${int(i.quantity)}</strong>${boxes}${pill?`<div style="margin-top:4px">${pill}</div>`:''}`}
+
+function render(){
+  $('countLine').textContent=`${items.length} producto(s) en la lista`;
+  if(!items.length){$('rows').innerHTML='<tr><td colspan="8" class="empty"><strong>No hay productos con estos filtros</strong><br>Cambia los filtros o crea uno con «＋ Producto».</td></tr>';return}
+  $('rows').innerHTML=items.map(i=>`<tr>
+    <td><strong>${esc(i.name)}</strong><div class="muted">${esc(i.sku)} · ${esc(i.brand)}</div></td>
+    <td><span class="tag">${esc(i.category_label)}</span></td>
+    <td class="right">${stockCell(i)}</td>
+    <td>${i.quantity?E.expiryPill(i.next_expiry,warnDays):'<span class="muted">—</span>'}${Number(i.expired_qty)?`<div class="muted" style="color:var(--danger)">${int(i.expired_qty)} vencidas</div>`:''}</td>
+    <td class="right nowrap">${money(i.unit_cost)}</td><td class="right nowrap">${i.sale_price!=null?money(i.sale_price):'<span class="muted">Sin precio</span>'}</td>
+    <td class="right">${pct(i.margin_pct)}</td>
+    <td><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap"><button class="tiny" data-act="view" data-id="${i.id}">Ver</button><button class="tiny" data-act="entry" data-id="${i.id}">Entrada</button></div></td></tr>`).join('')}
+
+$('rows').addEventListener('click',async e=>{const b=e.target.closest('button[data-act]');if(!b)return;if(b.dataset.act==='view')openDetail(b.dataset.id);else{await fetchCurrent(b.dataset.id);openEntry()}});
+async function fetchCurrent(id){current=await E.api('/inventory/'+id);return current}
+
+// ---------- Detalle ----------
+async function openDetail(id){try{const p=await fetchCurrent(id);
+  $('detEyebrow').textContent=`${p.brand} · ${p.category_label}`;$('detTitle').textContent=p.name;$('detSub').textContent=`Referencia ${p.sku}${p.notes?' · '+p.notes:''}`;
+  $('detMov').href='/admin/movimientos.html?producto='+p.id;
+  $('detBody').innerHTML=`<div class="detailgrid">
+    <div><span>Existencias</span><strong class="num">${int(p.quantity)}</strong> unidades</div><div><span>Costo promedio</span>${money(p.unit_cost)}</div>
+    <div><span>Precio de venta</span>${p.sale_price!=null?money(p.sale_price):'—'}</div><div><span>Margen</span>${pct(p.margin_pct)}</div>
+    <div><span>Vendidas en 90 días</span>${int(p.sold_90d)}</div><div><span>Mínimo</span>${int(p.min_stock)}</div></div>
+    <strong style="font:700 italic 16px var(--display);text-transform:uppercase">Lotes</strong>
+    <div class="minitable tablewrap" style="margin-top:8px"><table><thead><tr><th>Vence</th><th class="right">Unidades</th><th class="right">Costo unitario</th><th>Origen</th><th></th></tr></thead><tbody>
+    ${p.lots.length?p.lots.map(l=>`<tr><td>${E.expiryPill(l.expiry_date,warnDays)}</td><td class="right">${int(l.quantity)}<span class="muted"> / ${int(l.initial_quantity)}</span></td><td class="right">${money(l.unit_cost)}</td>
+      <td>${esc({initial:'Saldo inicial',purchase:'Compra #'+(l.purchase_id||''),manual:'Entrada manual',return:'Devolución'}[l.source]||l.source)}<div class="muted">${E.fmtDate(l.created_at)}</div></td>
+      <td><form class="filters" data-lot="${l.id}" style="flex-wrap:nowrap"><input type="month" class="filter" value="${dateToMonth(l.expiry_date)}" aria-label="Cambiar vencimiento" style="min-height:32px"><button class="tiny" type="submit">Guardar fecha</button></form></td></tr>`).join('')
+      :'<tr><td colspan="5" class="empty">Sin existencias.</td></tr>'}</tbody></table></div>`;
+  $('detExit').disabled=!p.quantity;E.openModal('detBg')}catch(e){E.toast(e.message)}}
+$('detBody').addEventListener('submit',async e=>{const f=e.target.closest('form[data-lot]');if(!f)return;e.preventDefault();
+  try{await E.patch('/lots/'+f.dataset.lot,{expiry_date:monthToDate(f.querySelector('input').value)});E.toast('Vencimiento actualizado');await openDetail(current.id);load()}catch(err){E.toast(err.message)}});
+$('detEdit').addEventListener('click',()=>{E.closeModal('detBg');openForm(current)});
+$('detEntry').addEventListener('click',()=>{E.closeModal('detBg');openEntry()});
+$('detExit').addEventListener('click',()=>{E.closeModal('detBg');openExit()});
+
+// ---------- Ficha ----------
+function updMargin(){const c=Number($('pCost').value||0),p=Number($('pPrice').value||0);$('pMargin').textContent=p?`${Math.round((p-c)/p*100)}% · ${money(p-c)} por unidad`:'Define el precio de venta'}
+function openForm(p){current=p||null;$('prodForm').reset();$('prodError').textContent='';$('prodTitle').textContent=p?'Editar producto':'Nuevo producto';
+  $('pInitial').classList.toggle('hidden',!!p);$('prodRetire').classList.toggle('hidden',!p||E.me.role!=='admin');
+  if(p){$('pSku').value=p.sku;$('pBrand').value=p.brand_id;$('pName').value=p.name;$('pCat').value=p.category;$('pBox').value=p.units_per_box;$('pCost').value=Number(p.unit_cost);$('pPrice').value=p.sale_price??'';$('pMin').value=p.min_stock;$('pNotes').value=p.notes||''}
+  else{$('pCat').value='gel';if($('fBrand').value)$('pBrand').value=$('fBrand').value}
+  $('pCost').disabled=!!(p&&p.quantity>0);$('pCostHint').classList.toggle('hidden',!(p&&p.quantity>0));updMargin();E.openModal('prodBg',p?'pName':'pSku')}
+$('newBtn').addEventListener('click',()=>openForm(null));['pCost','pPrice'].forEach(id=>$(id).addEventListener('input',updMargin));
+$('prodForm').addEventListener('submit',async e=>{e.preventDefault();$('prodError').textContent='';
+  if(!$('pSku').value.trim()||!$('pName').value.trim()||!$('pBrand').value){$('prodError').textContent='Referencia, nombre y marca son obligatorios.';return}
+  const body={sku:$('pSku').value.trim(),name:$('pName').value.trim(),brand_id:Number($('pBrand').value),category:$('pCat').value,units_per_box:Number($('pBox').value||1),
+    min_stock:Number($('pMin').value||0),unit_cost:Number($('pCost').value||0),sale_price:$('pPrice').value===''?null:Number($('pPrice').value),notes:$('pNotes').value.trim(),
+    initial_quantity:Number($('pQty').value||0),initial_expiry:monthToDate($('pExp').value)};
+  if(!Number.isInteger(body.initial_quantity)||!Number.isInteger(body.min_stock)){$('prodError').textContent='Las unidades deben ser números enteros.';return}
+  $('prodSave').disabled=true;try{const r=current?await E.patch('/inventory/'+current.id,body):await E.post('/inventory',body);E.closeModal('prodBg');E.toast(current?'Producto actualizado':`Producto ${r.sku} creado`);await load()}
+  catch(err){$('prodError').textContent=err.message}finally{$('prodSave').disabled=false}});
+$('prodRetire').addEventListener('click',async()=>{if(!(await E.confirm({title:'Retirar del catálogo',text:`${current.name} dejará de aparecer en inventario y ventas. Su historial se conserva. Solo es posible sin existencias.`,ok:'Retirar',danger:true})))return;
+  try{const r=await E.del('/inventory/'+current.id);E.closeModal('prodBg');E.toast(r.message);load()}catch(err){$('prodError').textContent=err.message}});
+
+// ---------- Entrada y salida ----------
+function openEntry(){$('entForm').reset();$('entError').textContent='';$('entTitle').textContent=current.name;$('eCost').value=Number(current.unit_cost)||'';E.openModal('entBg','eQty')}
+$('entForm').addEventListener('submit',async e=>{e.preventDefault();$('entError').textContent='';const q=Number($('eQty').value);
+  if(!Number.isInteger(q)||q<=0||$('eCost').value===''){$('entError').textContent='Indica unidades enteras y el costo unitario.';return}
+  $('entSave').disabled=true;try{await E.post(`/inventory/${current.id}/entry`,{quantity:q,unit_cost:Number($('eCost').value),expiry_date:monthToDate($('eExp').value),note:$('eNote').value.trim()});
+  E.closeModal('entBg');E.toast(`Entrada de ${q} unidad(es) registrada`);load()}catch(err){$('entError').textContent=err.message}finally{$('entSave').disabled=false}});
+function openExit(){$('exForm').reset();$('exError').textContent='';$('exTitle').textContent=current.name;
+  $('xLot').innerHTML='<option value="">Automático (vence primero)</option>'+current.lots.map(l=>`<option value="${l.id}">${l.expiry_date?E.fmtMonth(l.expiry_date):'Sin fecha'} · ${l.quantity} und.</option>`).join('');E.openModal('exBg','xQty')}
+$('exForm').addEventListener('submit',async e=>{e.preventDefault();$('exError').textContent='';const q=Number($('xQty').value);
+  if(!Number.isInteger(q)||q<=0){$('exError').textContent='Indica unidades enteras.';return}if($('xNote').value.trim().length<3){$('exError').textContent='Escribe el motivo de la salida.';return}
+  $('exSave').disabled=true;try{await E.post(`/inventory/${current.id}/exit`,{quantity:q,lot_id:$('xLot').value?Number($('xLot').value):null,note:$('xNote').value.trim()});
+  E.closeModal('exBg');E.toast(`Salida de ${q} unidad(es) registrada`);load()}catch(err){$('exError').textContent=err.message}finally{$('exSave').disabled=false}});
+
+// ---------- Marcas ----------
+function renderBrands(){$('brList').innerHTML=brands.map(b=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-soft)">
+  <div style="flex:1;min-width:0"><strong>${esc(b.name)}</strong><div class="muted">${b.products} producto(s) · ${int(b.units)} und.</div></div>
+  <button class="tiny" data-ren="${b.id}">Renombrar</button><button class="tiny" data-delb="${b.id}" ${b.products?'disabled title="Tiene productos"':''}>Eliminar</button></div>`).join('')||'<p class="hint">Aún no hay marcas.</p>'}
+$('brandsBtn').addEventListener('click',()=>{$('brError').textContent='';renderBrands();E.openModal('brBg','brName')});
+$('brForm').addEventListener('submit',async e=>{e.preventDefault();const n=$('brName').value.trim();if(!n)return;try{await E.post('/brands',{name:n});$('brName').value='';await loadBrands();renderBrands()}catch(err){$('brError').textContent=err.message}});
+$('brList').addEventListener('click',async e=>{const r=e.target.closest('[data-ren]'),d=e.target.closest('[data-delb]');$('brError').textContent='';
+  if(r){const b=brands.find(x=>x.id==r.dataset.ren);const name=await E.confirm({title:'Renombrar marca',text:`Nombre actual: ${b.name}`,ok:'Guardar',withReason:true,placeholder:'Nuevo nombre'});
+    if(name)try{await E.patch('/brands/'+b.id,{name});await loadBrands();renderBrands();load()}catch(err){$('brError').textContent=err.message}}
+  if(d){const b=brands.find(x=>x.id==d.dataset.delb);if(await E.confirm({title:'Eliminar marca',text:b.name,ok:'Eliminar',danger:true}))try{await E.del('/brands/'+b.id);await loadBrands();renderBrands()}catch(err){$('brError').textContent=err.message}}});
+
+// ---------- Vencimientos ----------
+async function loadExpiring(){try{const d=await E.api('/expiring?days='+$('vxDays').value);
+  $('vxBody').innerHTML=d.items.length?`<div class="minitable tablewrap"><table><thead><tr><th>Vence</th><th>Producto</th><th class="right">Unidades</th><th class="right">A costo</th><th class="right">A precio</th></tr></thead><tbody>${d.items.map(r=>`<tr>
+    <td>${E.expiryPill(r.expiry_date,warnDays)}</td><td><button class="linkbtn" data-open="${r.product_id}">${esc(r.name)}</button><div class="muted">${esc(r.sku)} · ${esc(r.brand)}</div></td>
+    <td class="right">${int(r.quantity)}</td><td class="right">${money(r.quantity*r.unit_cost)}</td><td class="right">${r.sale_price!=null?money(r.quantity*r.sale_price):'—'}</td></tr>`).join('')}</tbody></table></div>`
+    :'<p class="empty">Ningún lote vence en ese periodo.</p>'}catch(e){$('vxBody').innerHTML=`<p class="error">${esc(e.message)}</p>`}}
+$('expBtn').addEventListener('click',()=>{loadExpiring();E.openModal('vxBg')});$('vxDays').addEventListener('change',loadExpiring);
+$('vxBody').addEventListener('click',e=>{const b=e.target.closest('[data-open]');if(b){E.closeModal('vxBg');openDetail(b.dataset.open)}});
+
+['fBrand','fCat','fStatus'].forEach(id=>$(id).addEventListener('change',load));$('fSearch').addEventListener('input',E.debounce(load));
+</script>
+</body></html>
